@@ -1,12 +1,11 @@
-use std::sync::mpsc;
-use std::thread;
-
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{Device, Stream, StreamConfig};
 use ringbuf::HeapRb;
 use ringbuf::traits::{Consumer, Producer, Split};
 
-mod processing_pipeline;
+mod dsp;
+
+use dsp::{Distortion, DistortionPreset, Gain, SignalChain};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let host = cpal::default_host(); // OS audio system interface
@@ -21,19 +20,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let rb = HeapRb::<f32>::new(48_000); // 1 second buffer at 48kHz, consider decrease if latency is an issue
     let (producer, consumer) = rb.split();
 
-    let sample_rate = input_config.sample_rate as f32;
-    let (pitch_tx, pitch_rx) = mpsc::sync_channel::<Vec<f32>>(1);
-
-    thread::spawn(move || {
-        while let Ok(samples) = pitch_rx.recv() {
-            if let Some(freq) = detect_pitch(&samples, sample_rate) {
-                let note = hz_to_note(freq).unwrap_or(String::from("Unknown"));
-                // println!("frequency: {freq:.2} Hz. It is {note} note");
-            }
-        }
-    });
-
-    let input_stream = process_input(input_device, input_config, producer, pitch_tx)?;
+    let input_stream = process_input(input_device, input_config, producer)?;
     let output_stream = process_output(output_device, output_config, consumer)?;
 
     input_stream.play()?;
@@ -74,31 +61,20 @@ fn process_input<P>(
     input_device: Device,
     input_config: StreamConfig,
     mut producer: P,
-    pitch_tx: mpsc::SyncSender<Vec<f32>>,
 ) -> Result<Stream, Box<dyn std::error::Error>>
 where
     P: Producer<Item = f32> + Send + 'static,
 {
     let input_channels = input_config.channels as usize;
-    let mut pitch_buffer = Vec::with_capacity(4096); // 5120 samples for 1 second at 48kHz
+    let mut processing_chain = get_processing_chain();
     let stream = input_device.build_input_stream(
         &input_config,
         move |data: &[f32], _| {
             for frame in data.chunks(input_channels) {
-                let raw = frame[0];
+                let raw = (frame[0] + frame[1]) * 0.5;
 
-                pitch_buffer.push(raw);
-                let mut processor = processing_pipeline::ProcessingPipeline::new(raw);
-
-                if pitch_buffer.len() >= 4096 {
-                    let samples = std::mem::take(&mut pitch_buffer);
-                    let _ = pitch_tx.try_send(samples);
-                    pitch_buffer = Vec::with_capacity(4096);
-                }
-
-                // let processed = (raw * 50.0).clamp(-1.0, 1.0); //VOLUME (GAIN)
-                let processor = processor.apply_gain(10.).apply_distortion();
-                _ = producer.try_push(processor.get_output());
+                let processed = processing_chain.process(raw);
+                _ = producer.try_push(processed);
             }
         },
         move |err| eprintln!("Input error: {err}"),
@@ -106,6 +82,19 @@ where
     )?;
 
     Ok(stream)
+}
+
+fn get_processing_chain() -> SignalChain {
+    println!("Initing sound processing chain");
+    let mut processing_chain = SignalChain::new();
+
+    let gain = Gain::new(5).unwrap();
+    let distortion = Distortion::new(DistortionPreset::LightValve);
+
+    processing_chain.append_node(gain);
+    processing_chain.append_node(distortion);
+
+    processing_chain
 }
 
 fn process_output<C>(
