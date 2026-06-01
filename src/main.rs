@@ -6,6 +6,8 @@ use cpal::{Device, Stream, StreamConfig};
 use ringbuf::HeapRb;
 use ringbuf::traits::{Consumer, Producer, Split};
 
+mod processing_pipeline;
+
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let host = cpal::default_host(); // OS audio system interface
     let (input_device, output_device) = get_audio_devices(&host)?;
@@ -26,7 +28,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         while let Ok(samples) = pitch_rx.recv() {
             if let Some(freq) = detect_pitch(&samples, sample_rate) {
                 let note = hz_to_note(freq).unwrap_or(String::from("Unknown"));
-                println!("frequency: {freq:.2} Hz. It is {note} note");
+                // println!("frequency: {freq:.2} Hz. It is {note} note");
             }
         }
     });
@@ -36,8 +38,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     input_stream.play()?;
     output_stream.play()?;
-
-    // stream.play()?;
 
     println!("Listening... Press Enter to stop.");
     let mut input = String::new();
@@ -86,7 +86,9 @@ where
         move |data: &[f32], _| {
             for frame in data.chunks(input_channels) {
                 let raw = frame[0];
+
                 pitch_buffer.push(raw);
+                let mut processor = processing_pipeline::ProcessingPipeline::new(raw);
 
                 if pitch_buffer.len() >= 4096 {
                     let samples = std::mem::take(&mut pitch_buffer);
@@ -95,7 +97,8 @@ where
                 }
 
                 // let processed = (raw * 50.0).clamp(-1.0, 1.0); //VOLUME (GAIN)
-                _ = producer.try_push(raw);
+                let processor = processor.apply_gain(10.).apply_distortion();
+                _ = producer.try_push(processor.get_output());
             }
         },
         move |err| eprintln!("Input error: {err}"),
