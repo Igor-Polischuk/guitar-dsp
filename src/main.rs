@@ -5,7 +5,7 @@ use ringbuf::HeapRb;
 use ringbuf::traits::{Consumer, Producer, Split};
 
 use guitar_dsp::prelude::{
-    Distortion, DistortionPreset, Equalizer, Gain, HighPassFilter, SignalChain,
+    Distortion, DistortionPreset, Equalizer, Gain, HighPassFilter, MasterVolume, SignalChain,
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -95,8 +95,9 @@ fn get_processing_chain(sample_rate: f32) -> SignalChain {
     let distortion = Distortion::new(DistortionPreset::LightValve);
     let high_pass_filter = HighPassFilter::new(70.0, sample_rate); // for clean, 120 for high gain
     let low_pass_filter = LowPassFilter::new(8000.0, sample_rate);
+    let volume = MasterVolume::new(sample_rate);
 
-    let gain = Gain::new(4).unwrap();
+    let gain = Gain::new(10).unwrap();
 
     let mut eq = Equalizer::new(sample_rate);
     eq.set_bass_knob(6);
@@ -108,6 +109,7 @@ fn get_processing_chain(sample_rate: f32) -> SignalChain {
     processing_chain.append_node(distortion);
     processing_chain.append_node(eq);
     processing_chain.append_node(low_pass_filter);
+    processing_chain.append_node(volume);
 
     processing_chain
 }
