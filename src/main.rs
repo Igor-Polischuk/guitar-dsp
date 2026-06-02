@@ -4,7 +4,9 @@ use guitar_dsp::dsp::LowPassFilter;
 use ringbuf::HeapRb;
 use ringbuf::traits::{Consumer, Producer, Split};
 
-use guitar_dsp::prelude::{Distortion, DistortionPreset, Gain, HighPassFilter, SignalChain};
+use guitar_dsp::prelude::{
+    Distortion, DistortionPreset, Equalizer, Gain, HighPassFilter, SignalChain,
+};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let host = cpal::default_host(); // OS audio system interface
@@ -94,11 +96,17 @@ fn get_processing_chain(sample_rate: f32) -> SignalChain {
     let high_pass_filter = HighPassFilter::new(70.0, sample_rate); // for clean, 120 for high gain
     let low_pass_filter = LowPassFilter::new(8000.0, sample_rate);
 
-    let gain = Gain::new(5).unwrap();
+    let gain = Gain::new(4).unwrap();
+
+    let mut eq = Equalizer::new(sample_rate);
+    eq.set_bass_knob(6);
+    eq.set_mid_knob(2);
+    eq.set_treble_knob(8);
 
     processing_chain.append_node(high_pass_filter);
     processing_chain.append_node(gain);
     processing_chain.append_node(distortion);
+    processing_chain.append_node(eq);
     processing_chain.append_node(low_pass_filter);
 
     processing_chain

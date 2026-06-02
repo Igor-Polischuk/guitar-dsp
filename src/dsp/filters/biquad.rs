@@ -41,4 +41,12 @@ impl BiquadFilter {
 
         output
     }
+
+    pub fn update_coefficients(&mut self, b0: f32, b1: f32, b2: f32, a1: f32, a2: f32) {
+        self.b0 = b0;
+        self.b1 = b1;
+        self.b2 = b2;
+        self.a1 = a1;
+        self.a2 = a2;
+    }
 }
