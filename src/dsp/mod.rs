@@ -1,10 +1,12 @@
 pub mod effects;
+pub mod filters;
 
-mod chain;
 mod node;
-mod pitch_detection;
+mod pitch;
+mod signal_chain;
 
-pub use chain::SignalChain;
 pub use effects::{Distortion, DistortionPreset, Gain};
+pub use filters::{HighPassFilter, LowPassFilter};
 pub use node::AudioNode;
-pub use pitch_detection::{detect_pitch, hz_to_note};
+pub use pitch::{detect_pitch, hz_to_note};
+pub use signal_chain::SignalChain;

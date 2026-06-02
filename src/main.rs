@@ -1,11 +1,10 @@
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{Device, Stream, StreamConfig};
+use guitar_dsp::dsp::LowPassFilter;
 use ringbuf::HeapRb;
 use ringbuf::traits::{Consumer, Producer, Split};
 
-mod dsp;
-
-use dsp::{Distortion, DistortionPreset, Gain, SignalChain};
+use guitar_dsp::prelude::{Distortion, DistortionPreset, Gain, HighPassFilter, SignalChain};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let host = cpal::default_host(); // OS audio system interface
@@ -66,12 +65,16 @@ where
     P: Producer<Item = f32> + Send + 'static,
 {
     let input_channels = input_config.channels as usize;
-    let mut processing_chain = get_processing_chain();
+    let mut processing_chain = get_processing_chain(input_config.sample_rate as f32);
     let stream = input_device.build_input_stream(
         &input_config,
         move |data: &[f32], _| {
             for frame in data.chunks(input_channels) {
-                let raw = (frame[0] + frame[1]) * 0.5;
+                let raw = if input_channels >= 2 {
+                    (frame[0] + frame[1]) * 0.5
+                } else {
+                    frame[0]
+                };
 
                 let processed = processing_chain.process(raw);
                 _ = producer.try_push(processed);
@@ -84,15 +87,19 @@ where
     Ok(stream)
 }
 
-fn get_processing_chain() -> SignalChain {
+fn get_processing_chain(sample_rate: f32) -> SignalChain {
     println!("Initing sound processing chain");
     let mut processing_chain = SignalChain::new();
+    let distortion = Distortion::new(DistortionPreset::LightValve);
+    let high_pass_filter = HighPassFilter::new(70.0, sample_rate); // for clean, 120 for high gain
+    let low_pass_filter = LowPassFilter::new(8000.0, sample_rate);
 
     let gain = Gain::new(5).unwrap();
-    let distortion = Distortion::new(DistortionPreset::LightValve);
 
+    processing_chain.append_node(high_pass_filter);
     processing_chain.append_node(gain);
     processing_chain.append_node(distortion);
+    processing_chain.append_node(low_pass_filter);
 
     processing_chain
 }
