@@ -1,10 +1,13 @@
+pub mod cabinet;
 pub mod effects;
 pub mod filters;
 
+mod helpers;
 mod node;
 mod pitch;
 mod signal_chain;
 
+pub use cabinet::cabinet::{Cabinet, CabinetManager};
 pub use effects::{Distortion, DistortionPreset, Gain, MasterVolume};
 pub use filters::{Equalizer, HighPassFilter, LowPassFilter};
 pub use node::AudioNode;

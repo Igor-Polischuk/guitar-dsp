@@ -1,6 +1,6 @@
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{Device, Stream, StreamConfig};
-use guitar_dsp::dsp::LowPassFilter;
+use guitar_dsp::dsp::{Cabinet, CabinetManager, LowPassFilter};
 use ringbuf::HeapRb;
 use ringbuf::traits::{Consumer, Producer, Split};
 
@@ -92,22 +92,25 @@ where
 fn get_processing_chain(sample_rate: f32) -> SignalChain {
     println!("Initing sound processing chain");
     let mut processing_chain = SignalChain::new();
-    let distortion = Distortion::new(DistortionPreset::LightValve);
+    let gain = Gain::new(6).unwrap();
+    let distortion = Distortion::new(DistortionPreset::Crunch);
     let high_pass_filter = HighPassFilter::new(70.0, sample_rate); // for clean, 120 for high gain
     let low_pass_filter = LowPassFilter::new(8000.0, sample_rate);
     let volume = MasterVolume::new(sample_rate);
 
-    let gain = Gain::new(10).unwrap();
+    let cabinet_manager = CabinetManager::<1024>::new(sample_rate);
+    let cabinet = cabinet_manager.get_cabinet(Cabinet::CenzoCelestion);
 
     let mut eq = Equalizer::new(sample_rate);
-    eq.set_bass_knob(6);
+    eq.set_bass_knob(7);
     eq.set_mid_knob(2);
     eq.set_treble_knob(8);
 
     processing_chain.append_node(high_pass_filter);
     processing_chain.append_node(gain);
-    processing_chain.append_node(distortion);
+    // processing_chain.append_node(distortion);
     processing_chain.append_node(eq);
+    processing_chain.append_node(cabinet);
     processing_chain.append_node(low_pass_filter);
     processing_chain.append_node(volume);
 
