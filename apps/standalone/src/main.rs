@@ -1,12 +1,8 @@
 use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use cpal::{Device, Stream, StreamConfig};
-use guitar_dsp::dsp::{Cabinet, CabinetManager, LowPassFilter};
+use dsp_engine::prelude::*;
 use ringbuf::HeapRb;
 use ringbuf::traits::{Consumer, Producer, Split};
-
-use guitar_dsp::prelude::{
-    Distortion, DistortionPreset, Equalizer, Gain, HighPassFilter, MasterVolume, SignalChain,
-};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let host = cpal::default_host(); // OS audio system interface

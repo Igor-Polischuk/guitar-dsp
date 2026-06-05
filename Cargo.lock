@@ -146,6 +146,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "dsp-engine"
+version = "0.1.0"
+dependencies = [
+ "hound",
+]
+
+[[package]]
 name = "equivalent"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -176,11 +183,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "guitar-dsp"
+name = "guitar-standalone"
 version = "0.1.0"
 dependencies = [
  "cpal",
- "hound",
+ "dsp-engine",
  "ringbuf",
 ]
 

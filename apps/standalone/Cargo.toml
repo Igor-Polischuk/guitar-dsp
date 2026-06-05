@@ -1,0 +1,9 @@
+[package]
+name = "guitar-standalone"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+cpal.workspace = true
+ringbuf.workspace = true
+dsp-engine = { path = "../../crates/dsp-engine" }

@@ -1,0 +1,7 @@
+[package]
+name = "dsp-engine"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+hound.workspace = true
