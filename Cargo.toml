@@ -2,7 +2,7 @@
 resolver = "3"
 members = [
     "crates/dsp-core",
-    "apps/standalone",
+    "apps/standalone/src-tauri",
     "crates/audio-io"
 ]
 

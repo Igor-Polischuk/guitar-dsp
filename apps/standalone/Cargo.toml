@@ -1,8 +1,0 @@
-[package]
-name = "guitar-standalone"
-version.workspace = true
-edition.workspace = true
-
-[dependencies]
-dsp-core = { path = "../../crates/dsp-core" }
-audio-io = { path = "../../crates/audio-io" }
