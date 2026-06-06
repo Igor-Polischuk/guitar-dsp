@@ -1,5 +1,5 @@
 use cpal::traits::{DeviceTrait, HostTrait};
-use cpal::{Device, Host, SampleFormat};
+use cpal::{Device, Host};
 
 pub enum DeviceDirection {
     Input,
