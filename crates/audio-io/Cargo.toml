@@ -1,7 +1,8 @@
 [package]
-name = "dsp-engine"
+name = "audio-io"
 version.workspace = true
 edition.workspace = true
 
 [dependencies]
-hound.workspace = true
+cpal.workspace = true
+ringbuf.workspace = true

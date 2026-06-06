@@ -1,8 +1,9 @@
 [workspace]
 resolver = "3"
 members = [
-    "crates/dsp-engine",
+    "crates/dsp-core",
     "apps/standalone",
+    "crates/audio-io"
 ]
 
 [workspace.package]

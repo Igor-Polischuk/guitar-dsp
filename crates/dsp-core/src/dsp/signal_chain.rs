@@ -2,14 +2,19 @@ use super::AudioNode;
 
 pub struct SignalChain {
     nodes: Vec<Box<dyn AudioNode + Send>>,
+    sample_rate: f32,
 }
 
 impl SignalChain {
-    pub fn new() -> Self {
-        SignalChain { nodes: vec![] }
+    pub fn new(sample_rate: f32) -> Self {
+        SignalChain {
+            nodes: vec![],
+            sample_rate,
+        }
     }
 
-    pub fn append_node<T: AudioNode + Send + 'static>(&mut self, node: T) {
+    pub fn append_node<T: AudioNode + Send + 'static>(&mut self, mut node: T) {
+        // node.set_sample_rate(self.sample_rate);
         self.nodes.push(Box::new(node));
     }
 
@@ -20,11 +25,5 @@ impl SignalChain {
         }
 
         processed
-    }
-}
-
-impl Default for SignalChain {
-    fn default() -> Self {
-        Self::new()
     }
 }

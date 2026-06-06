@@ -4,6 +4,5 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
-cpal.workspace = true
-ringbuf.workspace = true
-dsp-engine = { path = "../../crates/dsp-engine" }
+dsp-core = { path = "../../crates/dsp-core" }
+audio-io = { path = "../../crates/audio-io" }
