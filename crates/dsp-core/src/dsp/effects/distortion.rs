@@ -1,3 +1,5 @@
+use std::sync::{Arc, atomic::AtomicBool};
+
 use crate::dsp::AudioNode;
 
 #[derive(Clone, Copy, Debug)]
@@ -41,12 +43,6 @@ impl Distortion {
 
 impl AudioNode for Distortion {
     fn process(&mut self, input: f32) -> f32 {
-        // if input < 0.0 {
-        //     self.negative_drive * (self.saturation_amount * input).tanh()
-        // } else {
-        //     (self.positive_drive * input).tanh()
-        // }
-
         if input < 0.0 {
             (input * self.negative_drive * self.saturation_amount).tanh()
         } else {

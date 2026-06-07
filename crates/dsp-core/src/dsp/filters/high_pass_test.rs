@@ -1,7 +1,7 @@
-use std::f32;
+use std::{f32, sync::Arc};
 
 use super::HighPassFilter;
-use crate::dsp::AudioNode;
+use crate::{dsp::AudioNode, utils::AtomicF32};
 
 const SAMPLE_RATE: f32 = 48_000.0;
 const TEST_SAMPLES: usize = 48_000;
@@ -30,10 +30,14 @@ fn filtered_rms(filter: &mut HighPassFilter, frequency: f32) -> f32 {
 
 #[test]
 fn attenuates_signal_below_cutoff_more_than_signal_above_cutoff() {
-    let cutoff = 180.0;
+    let cutoff = Arc::new(AtomicF32::new(180.0));
 
-    let low_frequency_rms = filtered_rms(&mut HighPassFilter::new(cutoff, SAMPLE_RATE), 40.0);
-    let high_frequency_rms = filtered_rms(&mut HighPassFilter::new(cutoff, SAMPLE_RATE), 1_000.0);
+    let low_frequency_rms =
+        filtered_rms(&mut HighPassFilter::new(cutoff.clone(), SAMPLE_RATE), 40.0);
+    let high_frequency_rms = filtered_rms(
+        &mut HighPassFilter::new(cutoff.clone(), SAMPLE_RATE),
+        1_000.0,
+    );
 
     assert!(
         low_frequency_rms < high_frequency_rms * 0.25,
@@ -47,7 +51,7 @@ fn attenuates_signal_below_cutoff_more_than_signal_above_cutoff() {
 
 #[test]
 fn removes_dc_offset_after_filter_warmup() {
-    let mut filter = HighPassFilter::new(80.0, SAMPLE_RATE);
+    let mut filter = HighPassFilter::new(Arc::new(AtomicF32::new(80.0)), SAMPLE_RATE);
     let mut sum = 0.0;
     let mut count = 0;
 

@@ -10,35 +10,44 @@ struct AudioState {
 
 struct AmpParams {
     gain: Arc<AtomicF32>,
-    equilizer_params: Arc<EqualizerParams>,
+    equalizer_params: Arc<EqualizerParams>,
+    lpf_cutoff_hz: Arc<AtomicF32>,
+    hpf_cutoff_hz: Arc<AtomicF32>,
+    volume: Arc<AtomicF32>,
 }
 
 #[tauri::command]
 fn update_parameter(label: &str, value: f32, amp: tauri::State<AmpParams>) {
-    if label == "GAIN" {
-        amp.gain.set(value);
-    }
-
-    if label == "BASS" {
-        amp.equilizer_params.set_bass(value);
-    }
-
-    if label == "MID" {
-        amp.equilizer_params.set_mid(value);
-    }
-
-    if label == "TREBLE" {
-        amp.equilizer_params.set_treble(value);
+    match label {
+        "GAIN" => amp.gain.set(value),
+        "BASS" => amp.equalizer_params.set_bass(value),
+        "MID" => amp.equalizer_params.set_mid(value),
+        "TREBLE" => amp.equalizer_params.set_treble(value),
+        "LPF" => amp.lpf_cutoff_hz.set(value),
+        "HPF" => amp.hpf_cutoff_hz.set(value),
+        "MASTER" => amp.volume.set(value),
+        _ => {}
     }
 }
 
 fn build_chain(sample_rate: f32, amp: tauri::State<AmpParams>) -> SignalChain {
     let mut processing_chain = SignalChain::new(sample_rate);
     let gain = Gain::new(amp.gain.clone());
-    let eq = Equalizer::new(sample_rate, amp.equilizer_params.clone());
+    let eq = Equalizer::new(sample_rate, amp.equalizer_params.clone());
+    let lpf = LowPassFilter::new(amp.lpf_cutoff_hz.clone(), sample_rate);
+    let hpf = HighPassFilter::new(amp.hpf_cutoff_hz.clone(), sample_rate);
+    let volume = MasterVolume::new(sample_rate, amp.volume.clone());
+    let dist = Distortion::new(DistortionPreset::SmoothTube);
 
+    // let cabinet_manager = CabinetManager::<2048>::new(sample_rate);
+    // let cab = cabinet_manager.get_cabinet(Cabinet::CenzoCelestion);
+    processing_chain.append_node(hpf);
     processing_chain.append_node(gain);
+    processing_chain.append_node(dist);
     processing_chain.append_node(eq);
+    processing_chain.append_node(lpf);
+    processing_chain.append_node(volume);
+    // processing_chain.append_node(cab);
 
     processing_chain
 }
@@ -81,9 +90,12 @@ pub fn run() {
             });
             app.manage(AmpParams {
                 gain: Arc::new(AtomicF32::new(10.0)),
-                equilizer_params: Arc::new(EqualizerParams {
+                equalizer_params: Arc::new(EqualizerParams {
                     ..Default::default()
                 }),
+                lpf_cutoff_hz: Arc::new(AtomicF32::new(8000.0)),
+                hpf_cutoff_hz: Arc::new(AtomicF32::new(80.0)),
+                volume: Arc::new(AtomicF32::new(0.0)),
             });
             Ok(())
         })
