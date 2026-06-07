@@ -1,4 +1,4 @@
-use crate::dsp::{helpers::ring_buffer::RingBuffer, AudioNode};
+use crate::dsp::{AudioNode, helpers::ring_buffer::RingBuffer};
 
 pub struct Convolution<const N: usize> {
     ir: [f32; N],

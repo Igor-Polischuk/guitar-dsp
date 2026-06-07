@@ -10,6 +10,21 @@ pub fn transform_ir<const N: usize>(ir: Vec<f32>) -> [f32; N] {
     arr
 }
 
+pub fn trim_ir_start(ir: Vec<f32>) -> Vec<f32> {
+    let threshold = 0.001;
+
+    let start = ir.iter().position(|s| s.abs() > threshold).unwrap_or(0);
+
+    ir[start..].to_vec()
+}
+
+pub fn scale_ir(mut ir: Vec<f32>, gain: f32) -> Vec<f32> {
+    for sample in ir.iter_mut() {
+        *sample *= gain;
+    }
+    ir
+}
+
 pub fn peak_normalize(mut ir: Vec<f32>) -> Vec<f32> {
     let max_peak = ir
         .iter()

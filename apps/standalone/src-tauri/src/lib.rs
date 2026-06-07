@@ -39,15 +39,15 @@ fn build_chain(sample_rate: f32, amp: tauri::State<AmpParams>) -> SignalChain {
     let volume = MasterVolume::new(sample_rate, amp.volume.clone());
     let dist = Distortion::new(DistortionPreset::SmoothTube);
 
-    // let cabinet_manager = CabinetManager::<2048>::new(sample_rate);
-    // let cab = cabinet_manager.get_cabinet(Cabinet::CenzoCelestion);
-    processing_chain.append_node(hpf);
-    processing_chain.append_node(gain);
-    processing_chain.append_node(dist);
-    processing_chain.append_node(eq);
-    processing_chain.append_node(lpf);
-    processing_chain.append_node(volume);
-    // processing_chain.append_node(cab);
+    let cabinet_manager = CabinetManager::<1024>::new(sample_rate);
+    let cab = cabinet_manager.get_cabinet(Cabinet::OpenBack);
+    // processing_chain.append_node(hpf);
+    // processing_chain.append_node(gain);
+    // processing_chain.append_node(dist);
+    // processing_chain.append_node(eq);
+    // processing_chain.append_node(lpf);
+    // processing_chain.append_node(volume);
+    processing_chain.append_node(cab);
 
     processing_chain
 }
