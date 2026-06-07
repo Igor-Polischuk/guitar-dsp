@@ -21,6 +21,7 @@
     --color-control-hover: #202c38;
     --color-control-border: #25303d;
     --color-control-border-strong: #303c4b;
+    --color-panel-line: rgba(122, 145, 166, 0.12);
     --color-grid: rgba(119, 145, 164, 0.09);
     --color-grid-strong: rgba(119, 145, 164, 0.16);
     --color-text: #d8e1eb;
@@ -33,7 +34,9 @@
     --color-accent-green: #16d7a1;
     --color-accent-cyan: #21c7bd;
     --color-accent-blue: #7c8dff;
+    --color-accent-blue-strong: #2f86ff;
     --color-accent-purple: #a85cf4;
+    --color-accent-red: #f05b4f;
     --color-meter-yellow: #f6f146;
     --color-meter-lime: #8ced4a;
 

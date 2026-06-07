@@ -1,129 +1,32 @@
 <script lang="ts">
+    import AmpPanel from "$lib/components/AmpPanel/AmpPanel.svelte";
     import AnalyzerDisplay from "$lib/components/AnalyzerDisplay/AnalyzerDisplay.svelte";
     import HeaderBar from "$lib/components/HeaderBar/HeaderBar.svelte";
-    import KnobControl from "$lib/components/KnobControl/KnobControl.svelte";
     import LevelMeter from "$lib/components/LevelMeter/LevelMeter.svelte";
+    import SignalChain from "$lib/components/SignalChain/SignalChain.svelte";
     import StatusBar from "$lib/components/StatusBar/StatusBar.svelte";
-    import UtilityDock from "$lib/components/UtilityDock/UtilityDock.svelte";
     import { invoke } from "@tauri-apps/api/core";
+    import { onMount } from "svelte";
 
-    invoke("start_audio");
-
-    type ControlConfig = {
-        label: string;
-        value: number;
-        min: number;
-        max: number;
-        step: number;
-        accent: "green" | "cyan" | "blue" | "purple";
-        formatter: (value: number) => string;
-    };
-
-    function formatDb(value: number) {
-        return `${value.toFixed(1)} dB`;
-    }
-
-    function formatSignedDb(value: number) {
-        const rounded = Number(value.toFixed(1));
-        return `${rounded > 0 ? "+" : ""}${rounded.toFixed(1)} dB`;
-    }
-
-    function formatHz(value: number) {
-        return `${Math.round(value)} Hz`;
-    }
-
-    function formatKhz(value: number) {
-        return `${value.toFixed(1)} kHz`;
-    }
-
-    const controls = [
-        {
-            label: "GAIN",
-            value: 5.2,
-            min: 1,
-            max: 750,
-            step: 20,
-            accent: "green",
-            formatter: formatDb,
-        },
-        {
-            label: "BASS",
-            value: 2.1,
-            min: -12,
-            max: 12,
-            step: 0.1,
-            accent: "green",
-            formatter: formatSignedDb,
-        },
-        {
-            label: "MID",
-            value: -0.4,
-            min: -12,
-            max: 12,
-            step: 0.1,
-            accent: "green",
-            formatter: formatSignedDb,
-        },
-        {
-            label: "TREBLE",
-            value: 3.3,
-            min: -12,
-            max: 12,
-            step: 0.1,
-            accent: "green",
-            formatter: formatSignedDb,
-        },
-        {
-            label: "HPF",
-            value: 80,
-            min: 50,
-            max: 120,
-            step: 10,
-            accent: "blue",
-            formatter: formatHz,
-        },
-        {
-            label: "LPF",
-            value: 8000,
-            min: 7000,
-            max: 12000,
-            step: 1000,
-            accent: "blue",
-            formatter: formatKhz,
-        },
-        {
-            label: "MASTER",
-            value: 0,
-            min: -54,
-            max: 6,
-            step: 0.1,
-            accent: "green",
-            formatter: formatDb,
-        },
-    ] satisfies ControlConfig[];
+    onMount(() => {
+        if ("__TAURI_INTERNALS__" in window) {
+            invoke("start_audio");
+        }
+    });
 </script>
 
 <main class="screen" aria-label="Guitar processor mock interface">
     <div class="processor-frame">
         <HeaderBar />
+        <AmpPanel />
 
-        <section class="workspace" aria-label="Processor workspace">
-            <LevelMeter label="INPUT" value="-8.7 dB" activeBars={1000} />
-
-            <section class="center-panel">
-                <div class="knob-row" aria-label="Tone and filter controls">
-                    {#each controls as control}
-                        <KnobControl {...control} />
-                    {/each}
-                </div>
-
-                <AnalyzerDisplay />
-                <UtilityDock />
-            </section>
-
-            <LevelMeter label="OUTPUT" value="-7.3 dB" activeBars={26} />
+        <section class="workspace" aria-label="Spectrum workspace">
+            <LevelMeter label="INPUT" value="-8.7 dB" activeBars={27} secondaryBars={22} />
+            <AnalyzerDisplay />
+            <LevelMeter label="OUTPUT" value="-7.3 dB" activeBars={25} secondaryBars={21} />
         </section>
 
+        <SignalChain />
         <StatusBar />
     </div>
 </main>
@@ -149,7 +52,7 @@
 
     .processor-frame {
         display: grid;
-        grid-template-rows: auto minmax(0, 1fr) auto;
+        grid-template-rows: auto auto minmax(22rem, 1fr) auto auto;
         width: 100%;
         min-height: 100vh;
         overflow: hidden;
@@ -166,33 +69,9 @@
     .workspace {
         display: grid;
         grid-template-columns: auto minmax(0, 1fr) auto;
-        gap: clamp(1.35rem, 1.9vw, 2rem);
+        gap: 0.85rem;
         min-width: 0;
-        padding: clamp(1.4rem, 2.1vw, 2rem) clamp(1.35rem, 1.65vw, 1.6rem)
-            0.85rem;
-    }
-
-    .center-panel {
-        display: grid;
-        grid-template-rows: auto minmax(18rem, 1fr) auto;
-        gap: 0.95rem;
-        min-width: 0;
-    }
-
-    .knob-row {
-        display: grid;
-        grid-template-columns: repeat(7, minmax(5.7rem, 1fr));
-        align-items: start;
-        gap: clamp(0.7rem, 1.75vw, 2.25rem);
-        min-width: 0;
-        padding: 0.05rem clamp(0.25rem, 0.7vw, 0.75rem) 0.7rem;
-    }
-
-    @media (max-width: 1160px) {
-        .knob-row {
-            grid-template-columns: repeat(4, minmax(5.7rem, 1fr));
-            row-gap: 1.1rem;
-        }
+        padding: 0.75rem 1.25rem 0.75rem;
     }
 
     @media (max-width: 980px) {
@@ -200,26 +79,12 @@
             grid-template-columns: 1fr 1fr;
             align-items: stretch;
         }
-
-        .center-panel {
-            grid-column: 1 / -1;
-            grid-row: 1;
-        }
     }
 
     @media (max-width: 680px) {
         .workspace {
             grid-template-columns: 1fr;
             padding: 1rem;
-        }
-
-        .center-panel {
-            grid-row: auto;
-        }
-
-        .knob-row {
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-            gap: 1rem 0.7rem;
         }
     }
 </style>

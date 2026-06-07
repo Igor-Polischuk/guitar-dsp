@@ -188,7 +188,7 @@
     .dial {
         position: relative;
         display: grid;
-        width: clamp(4.95rem, 7.4vw, 6.35rem);
+        width: var(--knob-size, clamp(4.95rem, 7.4vw, 6.35rem));
         aspect-ratio: 1;
         place-items: center;
         border-radius: 50%;
