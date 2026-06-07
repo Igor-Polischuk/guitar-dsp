@@ -1,4 +1,6 @@
 <script lang="ts">
+    import { invoke } from "@tauri-apps/api/core";
+
     type Accent = "green" | "cyan" | "blue" | "purple";
 
     export let label: string;
@@ -37,6 +39,7 @@
 
     function setValue(next: number) {
         currentValue = snap(next);
+        invoke("update_parameter", { label, value: currentValue });
     }
 
     function handleWheel(event: WheelEvent) {
@@ -56,7 +59,9 @@
         startY = event.clientY;
         startValue = currentValue;
 
-        (event.currentTarget as HTMLDivElement).setPointerCapture(event.pointerId);
+        (event.currentTarget as HTMLDivElement).setPointerCapture(
+            event.pointerId,
+        );
     }
 
     function handlePointerMove(event: PointerEvent) {
@@ -100,7 +105,7 @@
             ArrowDown: -1,
             ArrowLeft: -1,
             PageUp: 10,
-            PageDown: -10
+            PageDown: -10,
         };
 
         const direction = keySteps[event.key];
@@ -187,13 +192,12 @@
         aspect-ratio: 1;
         place-items: center;
         border-radius: 50%;
-        background:
-            conic-gradient(
-                from 220deg,
-                var(--knob-accent) 0deg var(--knob-arc),
-                rgba(95, 115, 132, 0.24) var(--knob-arc) 280deg,
-                transparent 280deg 360deg
-            );
+        background: conic-gradient(
+            from 220deg,
+            var(--knob-accent) 0deg var(--knob-arc),
+            rgba(95, 115, 132, 0.24) var(--knob-arc) 280deg,
+            transparent 280deg 360deg
+        );
         cursor: grab;
         filter: drop-shadow(0 12px 17px var(--color-shadow));
         outline: none;
@@ -205,13 +209,15 @@
     .dial:hover,
     .dial:focus-visible,
     .dial.dragging {
-        filter:
-            drop-shadow(0 12px 17px var(--color-shadow))
-            drop-shadow(0 0 12px color-mix(in srgb, var(--knob-accent), transparent 64%));
+        filter: drop-shadow(0 12px 17px var(--color-shadow))
+            drop-shadow(
+                0 0 12px color-mix(in srgb, var(--knob-accent), transparent 64%)
+            );
     }
 
     .dial:focus-visible {
-        box-shadow: 0 0 0 2px color-mix(in srgb, var(--knob-accent), transparent 36%);
+        box-shadow: 0 0 0 2px
+            color-mix(in srgb, var(--knob-accent), transparent 36%);
     }
 
     .dial.dragging {
@@ -224,7 +230,11 @@
         inset: 0.42rem;
         border-radius: inherit;
         background:
-            radial-gradient(circle at 42% 30%, rgba(255, 255, 255, 0.12), transparent 31%),
+            radial-gradient(
+                circle at 42% 30%,
+                rgba(255, 255, 255, 0.12),
+                transparent 31%
+            ),
             linear-gradient(145deg, #303b49, #161f29 70%);
         box-shadow:
             inset 0 1px 3px rgba(255, 255, 255, 0.12),
@@ -259,7 +269,8 @@
         height: 0.5rem;
         border-radius: 999px;
         background: var(--knob-accent);
-        box-shadow: 0 0 11px color-mix(in srgb, var(--knob-accent), transparent 35%);
+        box-shadow: 0 0 11px
+            color-mix(in srgb, var(--knob-accent), transparent 35%);
         transform: rotate(var(--knob-angle)) translateY(-0.2rem);
         transform-origin: 50% 205%;
     }

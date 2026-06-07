@@ -1,33 +1,19 @@
-use crate::dsp::AudioNode;
+use std::sync::Arc;
+
+use crate::{dsp::AudioNode, utils::AtomicF32};
 
 pub struct Gain {
-    knob_position: u8,
-    knob_values: [f32; 11],
+    value: Arc<AtomicF32>,
 }
 
 impl Gain {
-    pub fn new(knob_position: u8) -> Result<Self, String> {
-        if knob_position > 10 {
-            return Err(String::from("Incorrect knob value. Must be in range 0..10"));
-        }
-
-        Ok(Gain {
-            knob_position,
-            knob_values: [1.0, 1.6, 2.5, 4.0, 6.0, 10.0, 16.0, 25.0, 40.0, 63.0, 100.0],
-        })
-    }
-
-    pub fn set_knob(&mut self, knob_position: u8) {
-        self.knob_position = knob_position.min(10);
-    }
-
-    fn gain_value(&self) -> f32 {
-        self.knob_values[self.knob_position as usize]
+    pub fn new(value: Arc<AtomicF32>) -> Self {
+        Gain { value }
     }
 }
 
 impl AudioNode for Gain {
     fn process(&mut self, input: f32) -> f32 {
-        input * self.gain_value()
+        input * self.value.get()
     }
 }

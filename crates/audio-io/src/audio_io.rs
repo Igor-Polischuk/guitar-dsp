@@ -193,6 +193,8 @@ impl AudioIO {
         input_stream.play().map_err(|e| e.to_string())?;
         output_stream.play().map_err(|e| e.to_string())?;
 
+        println!("Playing audio streams");
+
         Ok(())
     }
 

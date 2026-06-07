@@ -5,6 +5,9 @@
     import LevelMeter from "$lib/components/LevelMeter/LevelMeter.svelte";
     import StatusBar from "$lib/components/StatusBar/StatusBar.svelte";
     import UtilityDock from "$lib/components/UtilityDock/UtilityDock.svelte";
+    import { invoke } from "@tauri-apps/api/core";
+
+    invoke("start_audio");
 
     type ControlConfig = {
         label: string;
@@ -37,9 +40,9 @@
         {
             label: "GAIN",
             value: 5.2,
-            min: 0,
-            max: 12,
-            step: 0.1,
+            min: 1,
+            max: 250,
+            step: 20,
             accent: "green",
             formatter: formatDb,
         },
