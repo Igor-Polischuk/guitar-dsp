@@ -1,9 +1,9 @@
 use crate::dsp::cabinet::{
-    convolution::Convolution,
     helpers::{
         apply_gain, fade_out_tail, fit_to_length, load_embedded_response, normalize_peak,
         remove_dc_offset, trim_leading_silence,
     },
+    partitioned_convolution::PartitionedConvolution,
 };
 
 pub enum Cabinet {
@@ -22,11 +22,11 @@ impl CabinetFactory {
         CabinetFactory { sample_rate }
     }
 
-    pub fn create_cabinet(&self, cab: Cabinet) -> Convolution<8192> {
-        let raw_ir = self.load_cabinet_asset(cab);
-        let ir = self.prepare_cabinet_response(raw_ir);
+    pub fn create_cabinet(&self, cab: Cabinet) -> PartitionedConvolution<512, 4096, 1024, 8, 513> {
+        let raw_response = self.load_cabinet_asset(cab);
+        let response = self.prepare_cabinet_response(raw_response);
 
-        Convolution::new(ir)
+        PartitionedConvolution::new(response)
     }
 
     fn load_cabinet_asset(&self, cab: Cabinet) -> &[u8] {
@@ -47,7 +47,7 @@ impl CabinetFactory {
         }
     }
 
-    fn prepare_cabinet_response(&self, asset_bytes: &[u8]) -> [f32; 8192] {
+    fn prepare_cabinet_response(&self, asset_bytes: &[u8]) -> [f32; 4096] {
         let response = load_embedded_response(asset_bytes, self.sample_rate)
             .expect("Failed to load cabinet response");
 
@@ -57,7 +57,7 @@ impl CabinetFactory {
         let response = normalize_peak(response);
         let response = apply_gain(response, 0.2);
 
-        let mut response = fit_to_length::<8192>(response);
+        let mut response = fit_to_length::<4096>(response);
         fade_out_tail(&mut response, 512);
 
         response

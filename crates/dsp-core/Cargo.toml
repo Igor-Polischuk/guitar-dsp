@@ -5,3 +5,4 @@ edition.workspace = true
 
 [dependencies]
 hound.workspace = true
+realfft.workspace = true

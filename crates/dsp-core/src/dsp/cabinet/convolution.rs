@@ -1,8 +1,9 @@
 use crate::dsp::{BlockProcessingNode, SampleProcessingNode, helpers::ring_buffer::RingBuffer};
 
+/// DEPRECATED
 pub struct Convolution<const N: usize> {
     ir: [f32; N],
-    history: RingBuffer<N>,
+    history: RingBuffer<N, f32>,
 }
 
 impl<const N: usize> Convolution<N> {
