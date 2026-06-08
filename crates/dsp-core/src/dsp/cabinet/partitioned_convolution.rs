@@ -1,3 +1,26 @@
+// TODO: Partitioned Convolution / Cabinet Engine
+//
+// - Add long random-stream test: compare FFT convolution against direct convolution
+//   over many blocks, not only one or two blocks.
+// - Add tests for different response sizes:
+//   1024, 2048, 4096, 8192.
+// - Add benchmark against direct convolution:
+//   direct 1024/2048/4096 vs FFT 1024/2048/4096/8192.
+// - Add null test helper:
+//   direct_output - fft_output should be close to zero.
+// - Add real cabinet response tests using actual WAV cabinet files.
+// - Add denormal protection for very small floating-point values.
+// - Replace RingBuffer::get() copy with get_ref() to avoid copying FrequencyBlock.
+// - Add quality presets:
+//   LowLatency = 1024,
+//   Standard = 4096,
+//   Studio = 8192.
+// - Add PreparedCabinetResponse / PreparedConvolutionData cache,
+//   so cabinet responses are not FFT-processed every time the chain is rebuilt.
+// - Later: support dynamic block sizes or internal buffering if the audio callback
+//   does not always provide exactly BLOCK_SIZE samples.
+// - Later: investigate non-uniform partitioned convolution for lower latency.
+
 use std::{array, sync::Arc};
 
 use realfft::{ComplexToReal, RealFftPlanner, RealToComplex, num_complex::Complex32};
