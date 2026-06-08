@@ -1,55 +1,65 @@
 use crate::dsp::cabinet::{
     convolution::Convolution,
-    helpers::{load_embedded_ir, peak_normalize, transform_ir, trim_ir_start},
+    helpers::{
+        apply_gain, fade_out_tail, fit_to_length, load_embedded_response, normalize_peak,
+        remove_dc_offset, trim_leading_silence,
+    },
 };
 
 pub enum Cabinet {
     CenzoCelestion,
-    OpenBack,
-    MarshalGreenback,
-    Marshal4x12V30,
+    OpenBack2x12,
+    MarshallGreenback4x12,
+    MarshallV30_4x12,
 }
 
-pub struct CabinetManager<const N: usize> {
+pub struct CabinetFactory {
     sample_rate: f32,
 }
 
-impl<const N: usize> CabinetManager<N> {
+impl CabinetFactory {
     pub fn new(sample_rate: f32) -> Self {
-        CabinetManager { sample_rate }
+        CabinetFactory { sample_rate }
     }
 
-    pub fn get_cabinet(&self, cab: Cabinet) -> Convolution<N> {
-        let raw_ir = self.get_cabinet_ir(cab);
-        let ir = self.process_ir(raw_ir);
+    pub fn create_cabinet(&self, cab: Cabinet) -> Convolution<8192> {
+        let raw_ir = self.load_cabinet_asset(cab);
+        let ir = self.prepare_cabinet_response(raw_ir);
 
         Convolution::new(ir)
     }
 
-    fn get_cabinet_ir(&self, cab: Cabinet) -> &[u8] {
+    fn load_cabinet_asset(&self, cab: Cabinet) -> &[u8] {
         match cab {
             Cabinet::CenzoCelestion => {
                 include_bytes!("../../assets/impulse_responsers/CenzoCelestion.wav")
             }
-            Cabinet::OpenBack => include_bytes!(
+            Cabinet::OpenBack2x12 => include_bytes!(
                 // "../../assets/impulse_responsers/OpenBack2x12/Ribbon/Open-Back 2x12 with Goodmans Green Label Mid 60s (Ribbon - Center).wav"
                 "../../assets/impulse_responsers/OpenBack2x12/AKD130/Open-Back 2x12 with Goodmans Green Label Mid 60s (AKG D130 - Back).wav"
             ),
-            Cabinet::MarshalGreenback => include_bytes!(
+            Cabinet::MarshallGreenback4x12 => include_bytes!(
                 "../../assets/impulse_responsers/GreenbackMarshal/M25 LL 1960TV 4x12 SM57 1.50in 0.0in SA73.wav"
             ),
-            Cabinet::Marshal4x12V30 => {
+            Cabinet::MarshallV30_4x12 => {
                 include_bytes!("../../assets/impulse_responsers/Marshal4x12V30/EV MIX D.wav")
             }
         }
     }
 
-    fn process_ir(&self, cab_ir_bytes: &[u8]) -> [f32; N] {
-        let ir = load_embedded_ir(cab_ir_bytes, self.sample_rate).unwrap();
-        let ir = trim_ir_start(ir);
-        let ir = peak_normalize(ir);
-        let ir = transform_ir(ir);
+    fn prepare_cabinet_response(&self, asset_bytes: &[u8]) -> [f32; 8192] {
+        let response = load_embedded_response(asset_bytes, self.sample_rate)
+            .expect("Failed to load cabinet response");
 
-        ir
+        let response = remove_dc_offset(response);
+
+        let response = trim_leading_silence(response);
+        let response = normalize_peak(response);
+        let response = apply_gain(response, 0.2);
+
+        let mut response = fit_to_length::<8192>(response);
+        fade_out_tail(&mut response, 512);
+
+        response
     }
 }

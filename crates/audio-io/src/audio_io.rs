@@ -27,7 +27,7 @@ pub struct AudioContext {
     pub sample_rate: SampleRate,
     pub input_channels: u16,
     pub output_channels: u16,
-    pub buffer_size: usize,
+    pub ring_buffer_capacity: usize,
 }
 
 pub struct AudioIoSettings {
@@ -43,7 +43,7 @@ impl Default for AudioIoSettings {
             input_device_name: None,
             output_device_name: None,
             preferred_sample_rates: vec![48000, 44100],
-            ring_buffer_size: 512,
+            ring_buffer_size: 8192,
         }
     }
 }
@@ -65,7 +65,7 @@ impl AudioIO {
     ) -> Result<(), String>
     where
         F: FnOnce(AudioContext) -> P,
-        P: FnMut(f32) -> f32 + Send + 'static,
+        P: FnMut(&mut [f32]) + Send + 'static,
     {
         if self.is_running() {
             return Err("AudioIO is already running. Call stop() or restart() first".to_string());
@@ -99,7 +99,7 @@ impl AudioIO {
                 sample_rate: config.sample_rate,
                 input_channels: config.input.stream_config.channels,
                 output_channels: config.output.stream_config.channels,
-                buffer_size: settings.ring_buffer_size,
+                ring_buffer_capacity: settings.ring_buffer_size,
             }),
             settings.ring_buffer_size,
         )?;
@@ -126,7 +126,7 @@ impl AudioIO {
     ) -> Result<(), String>
     where
         F: FnOnce(AudioContext) -> P,
-        P: FnMut(f32) -> f32 + Send + 'static,
+        P: FnMut(&mut [f32]) + Send + 'static,
     {
         self.stop();
         self.start(settings, processor_factory)
@@ -144,11 +144,15 @@ impl AudioIO {
         self.device_manager.set_output_device(name)
     }
 
-    fn build_streams<D>(&mut self, process_callback: D, buffer_size: usize) -> Result<(), String>
+    fn build_streams<D>(
+        &mut self,
+        process_callback: D,
+        ring_buffer_capacity: usize,
+    ) -> Result<(), String>
     where
-        D: FnMut(f32) -> f32 + Send + 'static,
+        D: FnMut(&mut [f32]) + Send + 'static,
     {
-        let buffer = HeapRb::<f32>::new(buffer_size);
+        let buffer = HeapRb::<f32>::new(ring_buffer_capacity);
         let (producer, consumer) = buffer.split();
         match self
             .config
@@ -157,9 +161,9 @@ impl AudioIO {
             .input
             .sample_format
         {
-            SampleFormat::F32 => self.build_input_stream::<f32, _, _>(process_callback, producer),
-            SampleFormat::I16 => self.build_input_stream::<i16, _, _>(process_callback, producer),
-            SampleFormat::U16 => self.build_input_stream::<u16, _, _>(process_callback, producer),
+            SampleFormat::F32 => self.build_input_stream::<f32, _>(producer),
+            SampleFormat::I16 => self.build_input_stream::<i16, _>(producer),
+            SampleFormat::U16 => self.build_input_stream::<u16, _>(producer),
             format => return Err(format!("Unsupported input sample format: {format:?}")),
         }?;
 
@@ -170,9 +174,9 @@ impl AudioIO {
             .output
             .sample_format
         {
-            SampleFormat::F32 => self.build_output_stream::<f32, _>(consumer),
-            SampleFormat::I16 => self.build_output_stream::<i16, _>(consumer),
-            SampleFormat::U16 => self.build_output_stream::<u16, _>(consumer),
+            SampleFormat::F32 => self.build_output_stream::<f32, _, _>(process_callback, consumer),
+            SampleFormat::I16 => self.build_output_stream::<i16, _, _>(process_callback, consumer),
+            SampleFormat::U16 => self.build_output_stream::<u16, _, _>(process_callback, consumer),
             format => return Err(format!("Unsupported output sample format: {format:?}")),
         }?;
 
@@ -198,15 +202,14 @@ impl AudioIO {
         Ok(())
     }
 
-    fn build_input_stream<T, C, P>(
+    fn build_input_stream<T, P>(
         &mut self,
-        mut process_callback: C,
+        // mut process_callback: C,
         mut producer: P,
     ) -> Result<(), String>
     where
         T: cpal::Sample + cpal::SizedSample,
         f32: cpal::FromSample<T>,
-        C: FnMut(f32) -> f32 + Send + 'static,
         P: Producer<Item = f32> + Send + 'static,
     {
         let input = self
@@ -228,14 +231,14 @@ impl AudioIO {
                 &config,
                 move |data: &[T], _| {
                     for frame in data.chunks(config.channels as usize) {
-                        let raw = if config.channels >= 2 {
+                        let mono = if config.channels >= 2 {
                             (frame[0].to_sample::<f32>() + frame[1].to_sample::<f32>()) * 0.5
                         } else {
                             frame[0].to_sample::<f32>()
                         };
 
-                        let processed = process_callback(raw);
-                        _ = producer.try_push(processed);
+                        // let processed = process_callback(raw);
+                        _ = producer.try_push(mono);
                     }
                 },
                 move |err| eprintln!("Input error: {err}"),
@@ -248,10 +251,15 @@ impl AudioIO {
         Ok(())
     }
 
-    fn build_output_stream<T, C>(&mut self, mut consumer: C) -> Result<(), String>
+    fn build_output_stream<T, P, C>(
+        &mut self,
+        mut block_processor: P,
+        mut consumer: C,
+    ) -> Result<(), String>
     where
         C: Consumer<Item = f32> + Send + 'static,
         T: cpal::Sample + cpal::SizedSample + cpal::FromSample<f32>,
+        P: FnMut(&mut [f32]) + Send + 'static,
     {
         let output = self
             .device_manager
@@ -266,17 +274,37 @@ impl AudioIO {
             .output
             .stream_config
             .clone();
+        let channels = config.channels as usize;
+        let mut scratch_buffer = Vec::new();
 
         let output_stream = output
             .build_output_stream(
                 &config,
                 move |data: &mut [T], _| {
-                    for frame in data.chunks_mut(config.channels as usize) {
-                        let sample = consumer.try_pop().unwrap_or(0.0);
+                    let frame_count = data.len() / channels;
+
+                    if scratch_buffer.len() != frame_count {
+                        println!("{}", frame_count);
+                        scratch_buffer.resize(frame_count, 0.0);
+                    }
+
+                    for sample in scratch_buffer.iter_mut() {
+                        *sample = consumer.try_pop().unwrap_or(0.0);
+                    }
+
+                    block_processor(&mut scratch_buffer);
+
+                    let mut sample_idx = 0;
+                    for frame in data.chunks_mut(channels) {
+                        if sample_idx >= scratch_buffer.len() {
+                            break;
+                        }
+                        let processed_sample = scratch_buffer[sample_idx];
 
                         for out in frame {
-                            *out = T::from_sample(sample);
+                            *out = T::from_sample(processed_sample);
                         }
+                        sample_idx += 1;
                     }
                 },
                 move |err| eprintln!("Output error: {err}"),

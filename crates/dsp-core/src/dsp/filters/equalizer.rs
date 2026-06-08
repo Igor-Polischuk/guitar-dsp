@@ -7,7 +7,7 @@ use std::{
 };
 
 use crate::{
-    dsp::{AudioNode, filters::biquad::BiquadFilter},
+    dsp::{SampleProcessingNode, filters::biquad::BiquadFilter},
     utils::AtomicF32,
 };
 
@@ -166,7 +166,7 @@ impl Equalizer {
     }
 }
 
-impl AudioNode for Equalizer {
+impl SampleProcessingNode for Equalizer {
     #[inline]
     fn process(&mut self, input: f32) -> f32 {
         self.update_if_needed();

@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::{dsp::AudioNode, utils::AtomicF32};
+use crate::{dsp::SampleProcessingNode, utils::AtomicF32};
 
 pub struct Gain {
     value: Arc<AtomicF32>,
@@ -12,7 +12,7 @@ impl Gain {
     }
 }
 
-impl AudioNode for Gain {
+impl SampleProcessingNode for Gain {
     fn process(&mut self, input: f32) -> f32 {
         input * self.value.get()
     }

@@ -1,29 +1,55 @@
-use super::AudioNode;
+use super::{BlockProcessingNode, SampleProcessingNode};
 
 pub struct SignalChain {
-    nodes: Vec<Box<dyn AudioNode + Send>>,
-    sample_rate: f32,
+    nodes: Vec<Box<dyn BlockProcessingNode + Send>>,
 }
 
 impl SignalChain {
-    pub fn new(sample_rate: f32) -> Self {
-        SignalChain {
-            nodes: vec![],
-            sample_rate,
-        }
+    pub fn new() -> Self {
+        SignalChain { nodes: vec![] }
     }
 
-    pub fn append_node<T: AudioNode + Send + 'static>(&mut self, mut node: T) {
-        // node.set_sample_rate(self.sample_rate);
+    pub fn append_node<T: BlockProcessingNode + Send + 'static>(&mut self, node: T) {
         self.nodes.push(Box::new(node));
     }
 
-    pub fn process(&mut self, signal_value: f32) -> f32 {
-        let mut processed = signal_value;
-        for node in &mut self.nodes {
-            processed = node.process(processed);
+    pub fn process(&mut self, samples_block: &mut [f32]) {
+        if !self.nodes.is_empty() {
+            for node in &mut self.nodes {
+                node.process_block(samples_block);
+            }
+        }
+    }
+}
+
+pub struct SampleProcessingChain {
+    nodes: Vec<Box<dyn SampleProcessingNode + Send>>,
+}
+
+impl SampleProcessingChain {
+    pub fn new() -> Self {
+        SampleProcessingChain { nodes: vec![] }
+    }
+
+    pub fn append_node<T: SampleProcessingNode + Send + 'static>(&mut self, node: T) {
+        self.nodes.push(Box::new(node));
+    }
+}
+
+impl BlockProcessingNode for SampleProcessingChain {
+    fn process_block(&mut self, samples: &mut [f32]) {
+        if self.nodes.is_empty() {
+            return;
         }
 
-        processed
+        for sample in samples.iter_mut() {
+            let mut processed = *sample;
+
+            for node in &mut self.nodes {
+                processed = node.process(processed);
+            }
+
+            *sample = processed;
+        }
     }
 }

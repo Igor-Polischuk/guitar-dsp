@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use crate::{dsp::AudioNode, utils::AtomicF32};
+use crate::{dsp::SampleProcessingNode, utils::AtomicF32};
 
 pub struct MasterVolume {
     target_gain: f32,
@@ -27,7 +27,7 @@ impl MasterVolume {
     }
 }
 
-impl AudioNode for MasterVolume {
+impl SampleProcessingNode for MasterVolume {
     #[inline]
     fn process(&mut self, input: f32) -> f32 {
         let db = self.volume_db.get();

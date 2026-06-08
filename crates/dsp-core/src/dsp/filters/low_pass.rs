@@ -1,7 +1,7 @@
 use std::{f32, sync::Arc};
 
 use super::biquad::BiquadFilter;
-use crate::{dsp::AudioNode, utils::AtomicF32};
+use crate::{dsp::SampleProcessingNode, utils::AtomicF32};
 
 pub struct LowPassFilter {
     pub biquad_filter: BiquadFilter,
@@ -52,7 +52,7 @@ impl LowPassFilter {
     }
 }
 
-impl AudioNode for LowPassFilter {
+impl SampleProcessingNode for LowPassFilter {
     #[inline]
     fn process(&mut self, input: f32) -> f32 {
         self.update_if_needed();

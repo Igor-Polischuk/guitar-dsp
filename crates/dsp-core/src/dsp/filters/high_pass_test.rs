@@ -1,7 +1,7 @@
 use std::{f32, sync::Arc};
 
 use super::HighPassFilter;
-use crate::{dsp::AudioNode, utils::AtomicF32};
+use crate::{dsp::SampleProcessingNode, utils::AtomicF32};
 
 const SAMPLE_RATE: f32 = 48_000.0;
 const TEST_SAMPLES: usize = 48_000;

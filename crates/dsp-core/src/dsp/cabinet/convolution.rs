@@ -1,4 +1,4 @@
-use crate::dsp::{AudioNode, helpers::ring_buffer::RingBuffer};
+use crate::dsp::{BlockProcessingNode, SampleProcessingNode, helpers::ring_buffer::RingBuffer};
 
 pub struct Convolution<const N: usize> {
     ir: [f32; N],
@@ -14,7 +14,7 @@ impl<const N: usize> Convolution<N> {
     }
 }
 
-impl<const N: usize> AudioNode for Convolution<N> {
+impl<const N: usize> SampleProcessingNode for Convolution<N> {
     fn process(&mut self, input: f32) -> f32 {
         let mut output = 0.0;
         self.history.push(input);
@@ -24,5 +24,13 @@ impl<const N: usize> AudioNode for Convolution<N> {
         }
 
         output
+    }
+}
+
+impl<const N: usize> BlockProcessingNode for Convolution<N> {
+    fn process_block(&mut self, samples: &mut [f32]) {
+        for sample in samples.iter_mut() {
+            *sample = self.process(*sample);
+        }
     }
 }

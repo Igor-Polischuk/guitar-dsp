@@ -7,9 +7,9 @@ mod node;
 mod pitch;
 mod signal_chain;
 
-pub use cabinet::cabinet::{Cabinet, CabinetManager};
+pub use cabinet::cabinet::{Cabinet, CabinetFactory};
 pub use effects::{Distortion, DistortionPreset, Gain, MasterVolume};
 pub use filters::{Equalizer, EqualizerParams, HighPassFilter, LowPassFilter};
-pub use node::AudioNode;
+pub use node::{BlockProcessingNode, SampleProcessingNode};
 pub use pitch::{detect_pitch, hz_to_note};
-pub use signal_chain::SignalChain;
+pub use signal_chain::{SampleProcessingChain, SignalChain};

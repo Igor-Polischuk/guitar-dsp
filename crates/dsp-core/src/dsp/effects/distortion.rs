@@ -1,6 +1,4 @@
-use std::sync::{Arc, atomic::AtomicBool};
-
-use crate::dsp::AudioNode;
+use crate::dsp::SampleProcessingNode;
 
 #[derive(Clone, Copy, Debug)]
 pub enum DistortionPreset {
@@ -41,7 +39,7 @@ impl Distortion {
     }
 }
 
-impl AudioNode for Distortion {
+impl SampleProcessingNode for Distortion {
     fn process(&mut self, input: f32) -> f32 {
         if input < 0.0 {
             (input * self.negative_drive * self.saturation_amount).tanh()

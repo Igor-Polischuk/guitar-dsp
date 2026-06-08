@@ -31,7 +31,7 @@ fn update_parameter(label: &str, value: f32, amp: tauri::State<AmpParams>) {
 }
 
 fn build_chain(sample_rate: f32, amp: tauri::State<AmpParams>) -> SignalChain {
-    let mut processing_chain = SignalChain::new(sample_rate);
+    let mut processing_chain = SignalChain::new();
     let gain = Gain::new(amp.gain.clone());
     let eq = Equalizer::new(sample_rate, amp.equalizer_params.clone());
     let lpf = LowPassFilter::new(amp.lpf_cutoff_hz.clone(), sample_rate);
@@ -39,15 +39,20 @@ fn build_chain(sample_rate: f32, amp: tauri::State<AmpParams>) -> SignalChain {
     let volume = MasterVolume::new(sample_rate, amp.volume.clone());
     let dist = Distortion::new(DistortionPreset::SmoothTube);
 
-    let cabinet_manager = CabinetManager::<1024>::new(sample_rate);
-    let cab = cabinet_manager.get_cabinet(Cabinet::OpenBack);
-    // processing_chain.append_node(hpf);
-    // processing_chain.append_node(gain);
-    // processing_chain.append_node(dist);
-    // processing_chain.append_node(eq);
-    // processing_chain.append_node(lpf);
-    // processing_chain.append_node(volume);
+    let mut pre_cab = SampleProcessingChain::new();
+
+    let cabinet_manager = CabinetFactory::new(sample_rate);
+    let cab = cabinet_manager.create_cabinet(Cabinet::MarshallV30_4x12);
+    pre_cab.append_node(hpf);
+    pre_cab.append_node(gain);
+    pre_cab.append_node(dist);
+    pre_cab.append_node(eq);
+    pre_cab.append_node(lpf);
+    processing_chain.append_node(pre_cab);
     processing_chain.append_node(cab);
+    let mut after_cab = SampleProcessingChain::new();
+    after_cab.append_node(volume);
+    processing_chain.append_node(after_cab);
 
     processing_chain
 }
@@ -67,7 +72,7 @@ fn start_audio(
         },
         move |ctx| {
             let mut processing_chain = build_chain(ctx.sample_rate as f32, amp);
-            move |sample| processing_chain.process(sample)
+            move |samples_block| processing_chain.process(samples_block)
         },
     )?;
 
