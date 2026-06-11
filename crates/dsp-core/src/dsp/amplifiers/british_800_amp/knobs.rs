@@ -1,4 +1,4 @@
-use crate::dsp::amplifiers::amp_param::KnobDescriptor;
+use crate::dsp::amplifiers::amp_param::{InputDescriptor, KnobDescriptor};
 
 pub const BRITISH_800_KNOBS: &[KnobDescriptor] = &[
     KnobDescriptor {
@@ -8,6 +8,7 @@ pub const BRITISH_800_KNOBS: &[KnobDescriptor] = &[
         max: 10.0,
         default: 5.0,
         unit: None,
+        step: 1.0,
     },
     KnobDescriptor {
         id: "bass",
@@ -16,6 +17,7 @@ pub const BRITISH_800_KNOBS: &[KnobDescriptor] = &[
         max: 10.0,
         default: 5.0,
         unit: None,
+        step: 1.0,
     },
     KnobDescriptor {
         id: "mid",
@@ -24,6 +26,7 @@ pub const BRITISH_800_KNOBS: &[KnobDescriptor] = &[
         max: 10.0,
         default: 6.0,
         unit: None,
+        step: 1.0,
     },
     KnobDescriptor {
         id: "treble",
@@ -32,21 +35,35 @@ pub const BRITISH_800_KNOBS: &[KnobDescriptor] = &[
         max: 10.0,
         default: 5.0,
         unit: None,
+        step: 1.0,
     },
     KnobDescriptor {
         id: "master_volume",
         label: "Master",
         min: 0.0,
         max: 10.0,
-        default: 4.0,
+        default: 10.0,
         unit: None,
+        step: 1.0,
     },
     KnobDescriptor {
         id: "pre_amp_volume",
         label: "Pre amp",
         min: 0.0,
         max: 10.0,
-        default: 4.0,
+        default: 5.0,
         unit: None,
+        step: 1.0,
+    },
+];
+
+pub const BRITISH_800_INPUTS: &[InputDescriptor] = &[
+    InputDescriptor {
+        id: "high_input",
+        label: "High",
+    },
+    InputDescriptor {
+        id: "low_input",
+        label: "Low",
     },
 ];

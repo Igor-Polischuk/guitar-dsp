@@ -1,47 +1,94 @@
 use audio_io::prelude::*;
+use dsp_core::dsp::{ActiveAmpParams, AmpModel, AmpNode, InputDescriptor, KnobDescriptor};
 use dsp_core::prelude::*;
 use std::default::Default;
-use std::sync::{Arc, Mutex};
+use std::sync::Mutex;
 use tauri::Manager;
 
-struct AudioState {
-    audio: Mutex<Option<AudioIO>>,
+pub struct ActiveAmpState {
+    pub model: AmpModel,
+    pub params: ActiveAmpParams,
 }
 
-struct AmpParams {
-    gain: Arc<AtomicF32>,
-    equalizer_params: Arc<EqualizerParams>,
-    lpf_cutoff_hz: Arc<AtomicF32>,
-    hpf_cutoff_hz: Arc<AtomicF32>,
-    volume: Arc<AtomicF32>,
+struct EngineState {
+    audio: Mutex<Option<AudioIO>>,
+    active_amp: Mutex<ActiveAmpState>,
 }
 
 #[tauri::command]
-fn update_parameter(label: &str, value: f32, amp: tauri::State<AmpParams>) {
-    match label {
-        "GAIN" => amp.gain.set(value),
-        "BASS" => amp.equalizer_params.set_bass(value),
-        "MID" => amp.equalizer_params.set_mid(value),
-        "TREBLE" => amp.equalizer_params.set_treble(value),
-        "LPF" => amp.lpf_cutoff_hz.set(value),
-        "HPF" => amp.hpf_cutoff_hz.set(value),
-        "MASTER" => amp.volume.set(value),
-        _ => {}
+fn update_amp_parameter(parameter_id: &str, value: f32, engine: tauri::State<EngineState>) {
+    let active_amp = engine.active_amp.lock().unwrap();
+
+    match &active_amp.params {
+        ActiveAmpParams::British800(params) => {
+            params.set(parameter_id, value);
+        }
     }
 }
 
-fn build_chain(sample_rate: f32, amp: tauri::State<AmpParams>) -> SignalChain {
+#[tauri::command]
+fn get_current_amplifier_knobs(engine: tauri::State<EngineState>) -> Vec<KnobDescriptor> {
+    let selected = *&engine.active_amp.lock().unwrap().model;
+
+    match selected {
+        AmpModel::British800 => British800Amp::knobs().to_vec(),
+    }
+}
+
+#[tauri::command]
+fn get_current_amplifier_inputs(engine: tauri::State<EngineState>) -> Vec<InputDescriptor> {
+    let selected_amp = *&engine.active_amp.lock().unwrap().model;
+
+    match selected_amp {
+        AmpModel::British800 => British800Amp::inputs().to_vec(),
+    }
+}
+
+#[tauri::command]
+fn get_current_amplifier_active_input(engine: tauri::State<EngineState>) -> String {
+    let active_amp = engine.active_amp.lock().unwrap();
+
+    match &active_amp.params {
+        ActiveAmpParams::British800(params) => params.active_input_id().to_string(),
+    }
+}
+
+#[tauri::command]
+fn set_active_amp_input(input_id: &str, engine: tauri::State<EngineState>) -> Result<(), String> {
+    let active_amp = engine.active_amp.lock().unwrap();
+
+    match &active_amp.params {
+        ActiveAmpParams::British800(params) => params.set_input(input_id),
+    }
+}
+
+#[tauri::command]
+fn set_active_amp(model: AmpModel, engine: tauri::State<EngineState>) {
+    let params = match model {
+        AmpModel::British800 => ActiveAmpParams::British800(British800Params::default()),
+    };
+
+    *engine.active_amp.lock().unwrap() = ActiveAmpState { model, params };
+}
+
+fn build_chain(sample_rate: f32, engine: tauri::State<EngineState>) -> SignalChain {
     let mut processing_chain = SignalChain::new();
+    let mut pre_cab = SampleProcessingChain::new();
 
-    let amp = British800Amp::new();
-    let cabinet_manager = CabinetFactory::new(sample_rate);
-    let cab = cabinet_manager.create_cabinet(Cabinet::MarshallV30_4x12);
+    {
+        let active_amp = engine.active_amp.lock().unwrap();
 
-    let mut sample_processing = SampleProcessingChain::new();
+        match &active_amp.params {
+            ActiveAmpParams::British800(params) => {
+                pre_cab.append_node(British800Amp::new(sample_rate, &params.clone()));
+            }
+        }
+    }
 
-    sample_processing.append_node(amp);
+    let cabinet_factory = CabinetFactory::new(sample_rate);
+    let cab = cabinet_factory.create_cabinet(Cabinet::MarshallGreenback4x12);
 
-    processing_chain.append_node(sample_processing);
+    processing_chain.append_node(pre_cab);
     processing_chain.append_node(cab);
 
     processing_chain
@@ -49,8 +96,8 @@ fn build_chain(sample_rate: f32, amp: tauri::State<AmpParams>) -> SignalChain {
 
 #[tauri::command]
 fn start_audio(
-    state: tauri::State<AudioState>,
-    amp: tauri::State<AmpParams>,
+    state: tauri::State<EngineState>,
+    current_amplifier: tauri::State<EngineState>,
 ) -> Result<(), String> {
     let mut audio = AudioIO::init();
 
@@ -61,7 +108,7 @@ fn start_audio(
             ..Default::default()
         },
         move |ctx| {
-            let mut processing_chain = build_chain(ctx.sample_rate as f32, amp);
+            let mut processing_chain = build_chain(ctx.sample_rate as f32, current_amplifier);
             move |samples_block| processing_chain.process(samples_block)
         },
     )?;
@@ -71,7 +118,7 @@ fn start_audio(
 }
 
 #[tauri::command]
-fn stop_audio(state: tauri::State<AudioState>) {
+fn stop_audio(state: tauri::State<EngineState>) {
     *state.audio.lock().unwrap() = None;
 }
 
@@ -80,24 +127,27 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
-            app.manage(AudioState {
+            app.manage(EngineState {
                 audio: Mutex::new(None),
+                active_amp: {
+                    Mutex::new(ActiveAmpState {
+                        model: AmpModel::British800,
+                        params: ActiveAmpParams::British800(British800Params::default()),
+                    })
+                },
             });
-            app.manage(AmpParams {
-                gain: Arc::new(AtomicF32::new(25.0)),
-                equalizer_params: Arc::new(EqualizerParams {
-                    ..Default::default()
-                }),
-                lpf_cutoff_hz: Arc::new(AtomicF32::new(8000.0)),
-                hpf_cutoff_hz: Arc::new(AtomicF32::new(80.0)),
-                volume: Arc::new(AtomicF32::new(0.0)),
-            });
+
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
-            update_parameter,
             start_audio,
-            stop_audio
+            stop_audio,
+            update_amp_parameter,
+            set_active_amp,
+            get_current_amplifier_knobs,
+            get_current_amplifier_inputs,
+            get_current_amplifier_active_input,
+            set_active_amp_input
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

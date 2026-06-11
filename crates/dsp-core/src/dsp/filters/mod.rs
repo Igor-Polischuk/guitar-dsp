@@ -1,4 +1,4 @@
-mod biquad;
+pub mod biquad;
 mod equalizer;
 mod high_pass;
 mod low_pass;

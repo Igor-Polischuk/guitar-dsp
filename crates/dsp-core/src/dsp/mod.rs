@@ -8,7 +8,10 @@ mod node;
 mod pitch;
 mod signal_chain;
 
-pub use amplifiers::{British800Amp, British800Params};
+pub use amplifiers::{
+    ActiveAmpParams, AmpModel, AmpNode, British800Amp, British800Params, InputDescriptor,
+    KnobDescriptor,
+};
 pub use cabinet::cabinet::{Cabinet, CabinetFactory};
 pub use effects::{Distortion, DistortionPreset, Gain, MasterVolume};
 pub use filters::{Equalizer, EqualizerParams, HighPassFilter, LowPassFilter};

@@ -12,11 +12,19 @@ pub struct AMPParms {
     pub default: f32,
 }
 
+#[derive(Clone, serde::Serialize)]
 pub struct KnobDescriptor {
     pub id: &'static str,
     pub label: &'static str,
     pub min: f32,
     pub max: f32,
     pub default: f32,
+    pub step: f32,
     pub unit: Option<&'static str>,
+}
+
+#[derive(Clone, serde::Serialize)]
+pub struct InputDescriptor {
+    pub id: &'static str,
+    pub label: &'static str,
 }

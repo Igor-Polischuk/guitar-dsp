@@ -1,8 +1,12 @@
 <script lang="ts">
     import KnobControl from "$lib/components/KnobControl/KnobControl.svelte";
     import { ChevronDown, EllipsisVertical } from "@lucide/svelte";
+    import { invoke } from "@tauri-apps/api/core";
+    import { onMount } from "svelte";
+    import { on } from "svelte/events";
 
     type ControlConfig = {
+        id: string;
         label: string;
         value: number;
         min: number;
@@ -12,66 +16,125 @@
         formatter: (value: number) => string;
     };
 
+    type AmpInputResponse = {
+        id: string;
+        label: string;
+    };
+
+    type AmpKnobsResponse = {
+        id: string;
+        label: string;
+        max: number;
+        min: number;
+        step: number;
+        default: number;
+        unit: null | null;
+    };
+
     function formatAmpValue(value: number) {
         return value.toFixed(1);
     }
 
-    const controls = [
-        {
-            label: "GAIN",
-            value: 6.4,
-            min: 0,
-            max: 10,
-            step: 0.1,
-            accent: "blue",
-            formatter: formatAmpValue,
-        },
-        {
-            label: "BASS",
-            value: 5.2,
-            min: 0,
-            max: 10,
-            step: 0.1,
-            accent: "blue",
-            formatter: formatAmpValue,
-        },
-        {
-            label: "MIDDLE",
-            value: 7.1,
-            min: 0,
-            max: 10,
-            step: 0.1,
-            accent: "blue",
-            formatter: formatAmpValue,
-        },
-        {
-            label: "TREBLE",
-            value: 6.3,
-            min: 0,
-            max: 10,
-            step: 0.1,
-            accent: "blue",
-            formatter: formatAmpValue,
-        },
-        {
-            label: "PRESENCE",
-            value: 5.0,
-            min: 0,
-            max: 10,
-            step: 0.1,
-            accent: "blue",
-            formatter: formatAmpValue,
-        },
-        {
-            label: "MASTER",
-            value: 6.8,
-            min: 0,
-            max: 10,
-            step: 0.1,
-            accent: "blue",
-            formatter: formatAmpValue,
-        },
-    ] satisfies ControlConfig[];
+    invoke("get_current_amplifier_knobs").then((response) => {
+        console.log(response);
+    });
+
+    // const controls = [
+    //     {
+    //         label: "GAIN",
+    //         value: 6.4,
+    //         min: 0,
+    //         max: 10,
+    //         step: 0.1,
+    //         accent: "blue",
+    //         formatter: formatAmpValue,
+    //     },
+    //     {
+    //         label: "BASS",
+    //         value: 5.2,
+    //         min: 0,
+    //         max: 10,
+    //         step: 0.1,
+    //         accent: "blue",
+    //         formatter: formatAmpValue,
+    //     },
+    //     {
+    //         label: "MIDDLE",
+    //         value: 7.1,
+    //         min: 0,
+    //         max: 10,
+    //         step: 0.1,
+    //         accent: "blue",
+    //         formatter: formatAmpValue,
+    //     },
+    //     {
+    //         label: "TREBLE",
+    //         value: 6.3,
+    //         min: 0,
+    //         max: 10,
+    //         step: 0.1,
+    //         accent: "blue",
+    //         formatter: formatAmpValue,
+    //     },
+    //     {
+    //         label: "PRESENCE",
+    //         value: 5.0,
+    //         min: 0,
+    //         max: 10,
+    //         step: 0.1,
+    //         accent: "blue",
+    //         formatter: formatAmpValue,
+    //     },
+    //     {
+    //         label: "MASTER",
+    //         value: 6.8,
+    //         min: 0,
+    //         max: 10,
+    //         step: 0.1,
+    //         accent: "blue",
+    //         formatter: formatAmpValue,
+    //     },
+    // ] satisfies ControlConfig[];
+
+    let controls: ControlConfig[] | null = null;
+    let inputs: AmpInputResponse[] | null = null;
+    let activeInputId: string | null = null;
+
+    async function fetchControls() {
+        const knobs = await invoke<AmpKnobsResponse[]>(
+            "get_current_amplifier_knobs",
+        );
+        inputs = await invoke<AmpInputResponse[]>(
+            "get_current_amplifier_inputs",
+        );
+        activeInputId = await invoke<string>(
+            "get_current_amplifier_active_input",
+        );
+
+        controls = knobs.map((knob, index) => {
+            return {
+                id: knob.id,
+                label: knob.label,
+                value: knob.default,
+                min: knob.min,
+                max: knob.max,
+                step: knob.step,
+                accent: ["green", "cyan", "blue", "purple"][
+                    index % 4
+                ] as ControlConfig["accent"],
+                formatter: formatAmpValue,
+            };
+        });
+    }
+
+    async function setActiveInput(inputId: string) {
+        await invoke("set_active_amp_input", { inputId });
+        activeInputId = inputId;
+    }
+
+    onMount(() => {
+        fetchControls();
+    });
 </script>
 
 <section class="amp-panel" aria-label="Amplifier model controls">
@@ -91,7 +154,7 @@
     <div class="amp-model">
         <span>AMPLIFIER</span>
         <button type="button" class="model-select">
-            Marshall Plexi 1959
+            British 800
             <ChevronDown size={17} />
         </button>
         <button type="button" class="change-model">CHANGE MODEL</button>
@@ -105,8 +168,17 @@
 
     <div class="channel">
         <span>CHANNEL</span>
-        <button type="button" class="channel-button active">BRIGHT</button>
-        <button type="button" class="channel-button">NORMAL</button>
+        {#each inputs as input}
+            <button
+                type="button"
+                class="channel-button {input.id === activeInputId
+                    ? 'active'
+                    : ''}"
+                on:click={() => setActiveInput(input.id)}
+            >
+                {input.label.toUpperCase()}
+            </button>
+        {/each}
     </div>
 
     <button
@@ -122,10 +194,9 @@
 <style>
     .amp-panel {
         display: grid;
-        grid-template-columns: minmax(13rem, 17.5rem) minmax(12rem, 1fr) minmax(
-                30rem,
-                3.6fr
-            ) minmax(7.5rem, 0.7fr) auto;
+        grid-template-columns:
+            minmax(13rem, 17.5rem) minmax(12rem, 1fr) minmax(30rem, 3.6fr)
+            minmax(7.5rem, 0.7fr) auto;
         align-items: center;
         gap: 1.35rem;
         min-height: 9.5rem;

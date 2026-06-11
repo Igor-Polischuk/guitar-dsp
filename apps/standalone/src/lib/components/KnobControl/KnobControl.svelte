@@ -4,6 +4,7 @@
     type Accent = "green" | "cyan" | "blue" | "purple";
 
     export let label: string;
+    export let id: string;
     export let value: number;
     export let min: number;
     export let max: number;
@@ -39,7 +40,10 @@
 
     function setValue(next: number) {
         currentValue = snap(next);
-        invoke("update_parameter", { label, value: currentValue });
+        invoke("update_amp_parameter", {
+            parameterId: id,
+            value: currentValue,
+        });
     }
 
     function handleWheel(event: WheelEvent) {
