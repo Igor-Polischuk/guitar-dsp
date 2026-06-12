@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use crate::dsp::{
     MasterVolume, SampleProcessingNode,
     amplifiers::{
@@ -9,6 +7,7 @@ use crate::dsp::{
             knobs::{BRITISH_800_INPUTS, BRITISH_800_KNOBS},
             params::{British800Input, British800Params},
             stages::{GainStage, InputStage},
+            tone_stack::MarshallToneStack,
         },
     },
 };
@@ -24,6 +23,7 @@ pub struct British800Amp {
     input_stage: InputStage,
     gain_stage: GainStage,
     volume: MasterVolume,
+    tone_stack: MarshallToneStack,
 }
 
 impl SampleProcessingNode for British800Amp {
@@ -31,7 +31,8 @@ impl SampleProcessingNode for British800Amp {
         let mut x = input;
         x = self.input_stage(x);
         x = self.gain_stage(x);
-        x = self.marshal_tone_stack(x);
+        x = self.tone_stack.process_sample(x);
+        x *= 20.0;
         x = self.volume.process(x);
         x = self.presence(x);
 
@@ -59,11 +60,19 @@ impl AmpNode for British800Amp {
 
 impl British800Amp {
     pub fn new(sample_rate: f32, params: &British800Params) -> Self {
+        let tone_stack = MarshallToneStack::new(
+            sample_rate,
+            params.bass.clone(),
+            params.mid.clone(),
+            params.treble.clone(),
+        );
+
         British800Amp {
             params: params.clone(),
             input_stage: InputStage::new(sample_rate),
             gain_stage: GainStage::new(sample_rate),
             volume: MasterVolume::new(sample_rate, params.master_volume.clone()),
+            tone_stack,
         }
     }
 
@@ -110,11 +119,6 @@ impl British800Amp {
         x = self.gain_stage.lpf_3.process(x);
 
         x
-    }
-
-    // TODO impl
-    fn marshal_tone_stack(&mut self, input: f32) -> f32 {
-        input
     }
 
     // TODO impl

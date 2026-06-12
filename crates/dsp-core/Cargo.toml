@@ -7,3 +7,4 @@ edition.workspace = true
 hound.workspace = true
 realfft.workspace = true
 serde.workspace = true
+nalgebra.workspace = true
