@@ -1,5 +1,6 @@
 pub mod dsp;
 pub mod utils;
+pub mod wdf;
 
 pub mod prelude {
     pub use crate::dsp::{
