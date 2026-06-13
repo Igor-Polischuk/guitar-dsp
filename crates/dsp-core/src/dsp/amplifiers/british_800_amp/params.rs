@@ -59,7 +59,10 @@ impl British800Params {
             "bass" => self.bass.set(knob_value),
             "mid" => self.mid.set(knob_value),
             "treble" => self.treble.set(knob_value),
-            "presence" => self.presence.set(knob_value),
+            "presence" => {
+                // let feedback_high_cut_db = -12.0 * knob_value;
+                self.presence.set(knob_value)
+            }
             "master_volume" => {
                 let t = (knob_value / 10.0).clamp(0.0, 1.0);
                 let volume;

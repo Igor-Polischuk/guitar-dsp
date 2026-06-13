@@ -5,10 +5,10 @@ pub const BRITISH_800_KNOBS: &[KnobDescriptor] = &[
         id: "presence",
         label: "Presence",
         min: 0.0,
-        max: 10.0,
-        default: 5.0,
+        max: 1.0,
+        default: 0.5,
         unit: None,
-        step: 1.0,
+        step: 0.1,
     },
     KnobDescriptor {
         id: "bass",

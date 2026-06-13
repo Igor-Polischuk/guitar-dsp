@@ -6,7 +6,7 @@ use crate::dsp::{
         british_800_amp::{
             knobs::{BRITISH_800_INPUTS, BRITISH_800_KNOBS},
             params::{British800Input, British800Params},
-            stages::{GainStage, InputStage},
+            stages::{GainStage, InputStage, PowerAmpStage},
             tone_stack::MarshallToneStack,
         },
     },
@@ -22,8 +22,9 @@ pub struct British800Amp {
 
     input_stage: InputStage,
     gain_stage: GainStage,
-    volume: MasterVolume,
     tone_stack: MarshallToneStack,
+    power_amp_stage: PowerAmpStage,
+    volume: MasterVolume,
 }
 
 impl SampleProcessingNode for British800Amp {
@@ -32,9 +33,8 @@ impl SampleProcessingNode for British800Amp {
         x = self.input_stage(x);
         x = self.gain_stage(x);
         x = self.tone_stack.process_sample(x);
-        x *= 20.0;
         x = self.volume.process(x);
-        x = self.presence(x);
+        x = self.power_amp_aprx(x);
 
         x
     }
@@ -73,6 +73,7 @@ impl British800Amp {
             gain_stage: GainStage::new(sample_rate),
             volume: MasterVolume::new(sample_rate, params.master_volume.clone()),
             tone_stack,
+            power_amp_stage: PowerAmpStage::new(sample_rate, params.presence.clone()),
         }
     }
 
@@ -121,9 +122,25 @@ impl British800Amp {
         x
     }
 
-    // TODO impl
-    fn presence(&mut self, input: f32) -> f32 {
-        input
+    fn power_amp_aprx(&mut self, input: f32) -> f32 {
+        let presence = self.params.presence.get().clamp(0.0, 1.0);
+        let fb_raw = self.power_amp_stage.last_power_amp_output;
+        let fb_high = self.power_amp_stage.presence_hpf.process(fb_raw);
+
+        let fb_shaped = fb_raw - presence * fb_high;
+
+        let feedback_amount = 0.35;
+        let mut x = input - feedback_amount * fb_shaped;
+        // x = self.power_amp_stage.hpf.process(x);
+
+        x *= 5.0;
+        x = x.tanh();
+
+        // x = self.power_amp_stage.lpf.process(x);
+
+        self.power_amp_stage.last_power_amp_output = x;
+
+        x * 0.8
     }
 }
 
