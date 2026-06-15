@@ -73,14 +73,13 @@ impl British800Amp {
             gain_stage: GainStage::new(sample_rate),
             volume: MasterVolume::new(sample_rate, params.master_volume.clone()),
             tone_stack,
-            power_amp_stage: PowerAmpStage::new(sample_rate, params.presence.clone()),
+            power_amp_stage: PowerAmpStage::new(sample_rate),
         }
     }
 
     fn input_stage(&mut self, input: f32) -> f32 {
         let mut x = input;
         if self.params.get_active_input() == British800Input::Low {
-            x *= 0.5; // - 6dB, BTW +20 dB ≈  x10
             x = self.input_stage.hpf_low_input.process(x);
         } else {
             x = self.input_stage.hpf_high_input.process(x);
@@ -92,55 +91,101 @@ impl British800Amp {
     }
 
     fn gain_stage(&mut self, input: f32) -> f32 {
-        let mut x = input;
+        let mut samples = [input, 0.0, 0.0, 0.0];
 
-        // Stage 1 lump gain and clipping
-        x *= 45.0; // approximate value, based on schema it within 40-50
-        x = x.tanh(); // soft clipping
+        for i in 0..samples.len() {
+            let mut x = samples[i];
+            x = self.gain_stage.up_lpf_1.process(x) * 4.0;
+            // x = self.gain_stage.up_lpf_2.process(x);
+            // x = self.gain_stage.up_lpf_3.process(x);
+            // x = self.gain_stage.up_lpf_4.process(x);
+            // Stage 1 lump gain and clipping
+            if self.params.get_active_input() == British800Input::High {
+                x *= 30.0; // approximate value, based on schema it within 40-50
+                x = x.tanh(); // soft clipping
+            }
 
-        x = self.gain_stage.hpf_1.process(x);
-        x = self.gain_stage.lpf_1.process(x);
+            x = self.gain_stage.hpf_1.process(x);
+            x = self.gain_stage.lpf_1.process(x);
 
-        x *= self.params.pre_amp_volume.get(); // volume params from 0 to 1, determine how many of signal will we pass
-        x *= 10.0;
+            x *= self.params.pre_amp_volume.get(); // volume params from 0 to 1, determine how many of signal will we pass
+            x *= 10.0;
 
-        x = self.gain_stage.cold_clipper.process(x);
+            if x < 0.0 {
+                x = (x * 1.3).tanh()
+            } else {
+                x = (x * 0.85).tanh();
+            }
 
-        x = self.gain_stage.hpf_2.process(x);
-        x = self.gain_stage.lpf_2.process(x);
+            x = self.gain_stage.hpf_2.process(x);
+            // x = self.gain_stage.lpf_2.process(x);
 
-        // Stage 3
-        x *= 7.0;
-        x = x.tanh();
+            // Stage 3
+            x *= 3.0;
+            x = x.tanh();
 
-        // optional level compensation
-        x *= 0.35;
+            x = self.gain_stage.hpf_3.process(x);
+            // x = self.gain_stage.lpf_3.process(x);
 
-        x = self.gain_stage.hpf_3.process(x);
-        x = self.gain_stage.lpf_3.process(x);
+            x = self.cathode_follower(x);
 
-        x
+            x = self.gain_stage.down_lpf_1.process(x);
+            x = self.gain_stage.down_lpf_2.process(x);
+            // x = self.gain_stage.down_lpf_3.process(x);
+            // x = self.gain_stage.down_lpf_4.process(x);
+
+            samples[i] = x;
+        }
+
+        samples[3]
+    }
+
+    fn cathode_follower(&mut self, input: f32) -> f32 {
+        let drive = 1.2;
+        let bias = 0.1;
+
+        let mut x = (input * drive + bias).tanh() - bias.tanh();
+
+        x = self.gain_stage.cathode_follower_lpw.process(x);
+
+        x * 0.83
     }
 
     fn power_amp_aprx(&mut self, input: f32) -> f32 {
         let presence = self.params.presence.get().clamp(0.0, 1.0);
-        let fb_raw = self.power_amp_stage.last_power_amp_output;
-        let fb_high = self.power_amp_stage.presence_hpf.process(fb_raw);
 
-        let fb_shaped = fb_raw - presence * fb_high;
+        let mut samples = [input, 0.0, 0.0, 0.0];
+        for i in 0..samples.len() {
+            let mut x = samples[i];
+            x = self.power_amp_stage.up_lpf_1.process(x) * 4.0;
+            // x = self.power_amp_stage.up_lpf_2.process(x);
+            // x = self.power_amp_stage.up_lpf_3.process(x);
+            // x = self.power_amp_stage.up_lpf_4.process(x);
 
-        let feedback_amount = 0.35;
-        let mut x = input - feedback_amount * fb_shaped;
-        // x = self.power_amp_stage.hpf.process(x);
+            let fb_raw = self.power_amp_stage.last_power_amp_output;
+            let fb_high = self.power_amp_stage.presence_hpf.process(fb_raw);
+            let fb_shaped = fb_raw - presence * fb_high;
 
-        x *= 5.0;
-        x = x.tanh();
+            let feedback_amount = 0.2;
+            x = x - feedback_amount * fb_shaped;
+            x = self.power_amp_stage.hpf.process(x);
 
-        // x = self.power_amp_stage.lpf.process(x);
+            x *= 3.0;
+            x = x.tanh();
 
-        self.power_amp_stage.last_power_amp_output = x;
+            self.power_amp_stage.last_power_amp_output = x;
 
-        x * 0.8
+            x = x * 0.7;
+
+            x = self.power_amp_stage.down_lpf_1.process(x);
+            x = self.power_amp_stage.down_lpf_2.process(x);
+            // x = self.power_amp_stage.down_lpf_3.process(x);
+            // x = self.power_amp_stage.down_lpf_4.process(x);
+
+            samples[i] = x;
+        }
+
+        samples[3]
     }
 }
 
