@@ -1,15 +1,22 @@
+use std::collections::VecDeque;
+use std::sync::atomic::Ordering;
+
+use crate::audio_stat::AudioStat;
 use crate::device_manager::{AudioIoDevice, DeviceManager};
+use crate::input_assembler::{self, InputBlockAssembler};
+use crate::output_reader::{self, OutputBlockReader, next_output_sample};
 use cpal::traits::{DeviceTrait, StreamTrait};
 use cpal::{SampleFormat, SampleRate, Stream, StreamConfig};
-use ringbuf::HeapRb;
 use ringbuf::traits::Split;
 use ringbuf::traits::{Consumer, Producer};
+use ringbuf::{HeapRb, LocalRb};
 
 pub struct AudioIO {
     device_manager: DeviceManager,
     input_stream: Option<Stream>,
     output_stream: Option<Stream>,
     config: Option<ResolvedAudioConfig>,
+    stats: AudioStat,
 }
 
 struct ResolvedAudioConfig {
@@ -28,6 +35,7 @@ pub struct AudioContext {
     pub input_channels: u16,
     pub output_channels: u16,
     pub ring_buffer_capacity: usize,
+    pub processing_block_size: usize,
 }
 
 pub struct AudioIoSettings {
@@ -48,13 +56,18 @@ impl Default for AudioIoSettings {
     }
 }
 
+// TODO add ability to change it
+const PROCESSING_BLOCK_SIZE: usize = 512;
+const OUTPUT_BLOCK_QUEUE_SIZE: usize = 16;
+
 impl AudioIO {
-    pub fn init() -> Self {
+    pub fn init(audio_stats: AudioStat) -> Self {
         AudioIO {
             device_manager: DeviceManager::new(),
             input_stream: None,
             output_stream: None,
             config: None,
+            stats: audio_stats,
         }
     }
 
@@ -100,6 +113,7 @@ impl AudioIO {
                 input_channels: config.input.stream_config.channels,
                 output_channels: config.output.stream_config.channels,
                 ring_buffer_capacity: settings.ring_buffer_size,
+                processing_block_size: PROCESSING_BLOCK_SIZE,
             }),
             settings.ring_buffer_size,
         )?;
@@ -226,6 +240,8 @@ impl AudioIO {
             .stream_config
             .clone();
 
+        let input_overflow_count = self.stats.input_overflow_count.clone();
+
         let input_stream = input
             .build_input_stream(
                 &config,
@@ -237,8 +253,9 @@ impl AudioIO {
                             frame[0].to_sample::<f32>()
                         };
 
-                        // let processed = process_callback(raw);
-                        _ = producer.try_push(mono);
+                        if producer.try_push(mono).is_err() {
+                            input_overflow_count.fetch_add(1, Ordering::Relaxed);
+                        }
                     }
                 },
                 move |err| eprintln!("Input error: {err}"),
@@ -250,7 +267,6 @@ impl AudioIO {
 
         Ok(())
     }
-
     fn build_output_stream<T, P, C>(
         &mut self,
         mut block_processor: P,
@@ -275,36 +291,47 @@ impl AudioIO {
             .stream_config
             .clone();
         let channels = config.channels as usize;
-        let mut scratch_buffer = Vec::new();
+        let output_overflow_count = self.stats.output_overflow_count.clone();
+        let input_underrun_count = self.stats.input_underrun_count.clone();
+        let output_underrun_count = self.stats.output_underrun_count.clone();
+        let processed_block_count = self.stats.processed_block_count.clone();
 
+        let mut input_assembler = InputBlockAssembler::<PROCESSING_BLOCK_SIZE>::new();
+        let mut output_reader = OutputBlockReader::<PROCESSING_BLOCK_SIZE>::new();
+        let output_blocks = HeapRb::<[f32; PROCESSING_BLOCK_SIZE]>::new(OUTPUT_BLOCK_QUEUE_SIZE);
+        let (mut output_producer, mut output_consumer) = output_blocks.split();
         let output_stream = output
             .build_output_stream(
                 &config,
                 move |data: &mut [T], _| {
-                    let frame_count = data.len() / channels;
+                    let mono_audio_len = data.len() / channels;
 
-                    if scratch_buffer.len() != frame_count {
-                        println!("{}", frame_count);
-                        scratch_buffer.resize(frame_count, 0.0);
-                    }
+                    for _ in 0..mono_audio_len {
+                        let raw = consumer.try_pop().unwrap_or_else(|| {
+                            input_underrun_count.fetch_add(1, Ordering::Relaxed);
+                            0.0
+                        });
 
-                    for sample in scratch_buffer.iter_mut() {
-                        *sample = consumer.try_pop().unwrap_or(0.0);
-                    }
+                        if let Some(mut block) = input_assembler.push_sample(raw) {
+                            block_processor(&mut block);
+                            processed_block_count.fetch_add(1, Ordering::Relaxed);
 
-                    block_processor(&mut scratch_buffer);
-
-                    let mut sample_idx = 0;
-                    for frame in data.chunks_mut(channels) {
-                        if sample_idx >= scratch_buffer.len() {
-                            break;
+                            if output_producer.try_push(block).is_err() {
+                                output_overflow_count.fetch_add(1, Ordering::Relaxed);
+                            }
                         }
-                        let processed_sample = scratch_buffer[sample_idx];
+                    }
+
+                    for frame in data.chunks_mut(channels) {
+                        let sample = next_output_sample(&mut output_reader, &mut output_consumer)
+                            .unwrap_or_else(|| {
+                                output_underrun_count.fetch_add(1, Ordering::Relaxed);
+                                0.0
+                            });
 
                         for out in frame {
-                            *out = T::from_sample(processed_sample);
+                            *out = T::from_sample(sample);
                         }
-                        sample_idx += 1;
                     }
                 },
                 move |err| eprintln!("Output error: {err}"),

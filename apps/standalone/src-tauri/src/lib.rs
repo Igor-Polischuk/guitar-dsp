@@ -86,7 +86,7 @@ fn build_chain(sample_rate: f32, engine: tauri::State<EngineState>) -> SignalCha
     }
 
     let cabinet_factory = CabinetFactory::new(sample_rate);
-    let cab = cabinet_factory.create_cabinet(Cabinet::MarshallGreenback4x12);
+    let cab = cabinet_factory.create_cabinet(Cabinet::MarshallV30_4x12);
 
     processing_chain.append_node(pre_cab);
     processing_chain.append_node(cab);
@@ -99,12 +99,15 @@ fn start_audio(
     state: tauri::State<EngineState>,
     current_amplifier: tauri::State<EngineState>,
 ) -> Result<(), String> {
-    let mut audio = AudioIO::init();
+    let stat = AudioStat::new();
+    let mut audio = AudioIO::init(stat);
+    println!("{:?}", audio.available_devices());
 
     audio.start(
         AudioIoSettings {
             input_device_name: Some("Volt 1".into()),
             output_device_name: Some("MacBook Pro Speakers".into()),
+            // output_device_name: Some("External Headphones".into()),
             ..Default::default()
         },
         move |ctx| {
