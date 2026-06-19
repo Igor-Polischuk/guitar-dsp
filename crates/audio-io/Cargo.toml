@@ -6,3 +6,4 @@ edition.workspace = true
 [dependencies]
 cpal.workspace = true
 ringbuf.workspace = true
+serde.workspace = true

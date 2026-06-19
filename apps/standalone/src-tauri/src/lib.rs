@@ -1,19 +1,15 @@
+mod devices_managment;
+mod state;
+
+use devices_managment::{is_devices_selected, list_audio_devices, set_devices};
+use state::{ActiveAmpState, EngineState};
+
 use audio_io::prelude::*;
 use dsp_core::dsp::{ActiveAmpParams, AmpModel, AmpNode, InputDescriptor, KnobDescriptor};
 use dsp_core::prelude::*;
 use std::default::Default;
 use std::sync::Mutex;
 use tauri::Manager;
-
-pub struct ActiveAmpState {
-    pub model: AmpModel,
-    pub params: ActiveAmpParams,
-}
-
-struct EngineState {
-    audio: Mutex<Option<AudioIO>>,
-    active_amp: Mutex<ActiveAmpState>,
-}
 
 #[tauri::command]
 fn update_amp_parameter(parameter_id: &str, value: f32, engine: tauri::State<EngineState>) {
@@ -99,30 +95,23 @@ fn start_audio(
     state: tauri::State<EngineState>,
     current_amplifier: tauri::State<EngineState>,
 ) -> Result<(), String> {
-    let stat = AudioStat::new();
-    let mut audio = AudioIO::init(stat);
-    println!("{:?}", audio.available_devices());
+    let mut audio = state.audio.lock().unwrap();
 
-    audio.start(
-        AudioIoSettings {
-            input_device_name: Some("Volt 1".into()),
-            output_device_name: Some("MacBook Pro Speakers".into()),
-            // output_device_name: Some("External Headphones".into()),
-            ..Default::default()
-        },
-        move |ctx| {
-            let mut processing_chain = build_chain(ctx.sample_rate as f32, current_amplifier);
-            move |samples_block| processing_chain.process(samples_block)
-        },
-    )?;
+    if is_devices_selected(state.clone()) {
+        return Err(String::from("Can't start audio without devices"));
+    }
 
-    *state.audio.lock().unwrap() = Some(audio);
+    audio.start(AudioIoSettings::default(), move |ctx| {
+        let mut processing_chain = build_chain(ctx.sample_rate as f32, current_amplifier);
+        move |samples_block| processing_chain.process(samples_block)
+    })?;
+
     Ok(())
 }
 
 #[tauri::command]
 fn stop_audio(state: tauri::State<EngineState>) {
-    *state.audio.lock().unwrap() = None;
+    state.audio.lock().unwrap().stop();
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -130,8 +119,10 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .setup(|app| {
+            let stat = AudioStat::new();
+            let audio = AudioIO::init(stat);
             app.manage(EngineState {
-                audio: Mutex::new(None),
+                audio: Mutex::new(audio),
                 active_amp: {
                     Mutex::new(ActiveAmpState {
                         model: AmpModel::British800,
@@ -150,7 +141,10 @@ pub fn run() {
             get_current_amplifier_knobs,
             get_current_amplifier_inputs,
             get_current_amplifier_active_input,
-            set_active_amp_input
+            set_active_amp_input,
+            list_audio_devices,
+            is_devices_selected,
+            set_devices
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

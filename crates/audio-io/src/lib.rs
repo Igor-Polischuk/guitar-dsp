@@ -7,4 +7,5 @@ mod output_reader;
 pub mod prelude {
     pub use crate::audio_io::{AudioIO, AudioIoSettings};
     pub use crate::audio_stat::AudioStat;
+    pub use crate::device_manager::AudioIoDevice;
 }

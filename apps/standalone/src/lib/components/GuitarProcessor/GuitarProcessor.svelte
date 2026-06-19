@@ -1,6 +1,7 @@
 <script lang="ts">
     import AmpPanel from "$lib/components/AmpPanel/AmpPanel.svelte";
     import AnalyzerDisplay from "$lib/components/AnalyzerDisplay/AnalyzerDisplay.svelte";
+    import AudioSetupDialog from "$lib/components/AudioSetupDialog/AudioSetupDialog.svelte";
     import HeaderBar from "$lib/components/HeaderBar/HeaderBar.svelte";
     import LevelMeter from "$lib/components/LevelMeter/LevelMeter.svelte";
     import SignalChain from "$lib/components/SignalChain/SignalChain.svelte";
@@ -8,9 +9,16 @@
     import { invoke } from "@tauri-apps/api/core";
     import { onMount } from "svelte";
 
-    onMount(() => {
+    let audioSetupOpen = false;
+
+    onMount(async () => {
         if ("__TAURI_INTERNALS__" in window) {
-            invoke("start_audio");
+            try {
+                const isSelectedDevice = await invoke<boolean>("is_devices_selected");
+                audioSetupOpen = !isSelectedDevice;
+            } catch {
+                audioSetupOpen = true;
+            }
         }
     });
 </script>
@@ -21,14 +29,29 @@
         <AmpPanel />
 
         <section class="workspace" aria-label="Spectrum workspace">
-            <LevelMeter label="INPUT" value="-8.7 dB" activeBars={27} secondaryBars={22} />
+            <LevelMeter
+                label="INPUT"
+                value="-8.7 dB"
+                activeBars={27}
+                secondaryBars={22}
+            />
             <AnalyzerDisplay />
-            <LevelMeter label="OUTPUT" value="-7.3 dB" activeBars={25} secondaryBars={21} />
+            <LevelMeter
+                label="OUTPUT"
+                value="-7.3 dB"
+                activeBars={25}
+                secondaryBars={21}
+            />
         </section>
 
         <SignalChain />
         <StatusBar />
     </div>
+
+    <AudioSetupDialog
+        open={audioSetupOpen}
+        onClose={() => (audioSetupOpen = false)}
+    />
 </main>
 
 <style>

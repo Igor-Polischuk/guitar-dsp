@@ -6,7 +6,7 @@ pub enum DeviceDirection {
     Output,
 }
 
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize)]
 pub struct AudioIoDevice {
     pub name: String,
     pub is_input: bool,

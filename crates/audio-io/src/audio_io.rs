@@ -1,15 +1,13 @@
-use std::collections::VecDeque;
-use std::sync::atomic::Ordering;
-
 use crate::audio_stat::AudioStat;
 use crate::device_manager::{AudioIoDevice, DeviceManager};
-use crate::input_assembler::{self, InputBlockAssembler};
-use crate::output_reader::{self, OutputBlockReader, next_output_sample};
+use crate::input_assembler::InputBlockAssembler;
+use crate::output_reader::{OutputBlockReader, next_output_sample};
 use cpal::traits::{DeviceTrait, StreamTrait};
-use cpal::{SampleFormat, SampleRate, Stream, StreamConfig};
+use cpal::{Device, SampleFormat, SampleRate, Stream, StreamConfig};
+use ringbuf::HeapRb;
 use ringbuf::traits::Split;
 use ringbuf::traits::{Consumer, Producer};
-use ringbuf::{HeapRb, LocalRb};
+use std::sync::atomic::Ordering;
 
 pub struct AudioIO {
     device_manager: DeviceManager,
@@ -156,6 +154,14 @@ impl AudioIO {
 
     pub fn set_output_device(&mut self, name: &str) -> Result<(), String> {
         self.device_manager.set_output_device(name)
+    }
+
+    pub fn active_input(&self) -> Option<&Device> {
+        self.device_manager.active_input_device.as_ref()
+    }
+
+    pub fn active_output(&self) -> Option<&Device> {
+        self.device_manager.active_output_device.as_ref()
     }
 
     fn build_streams<D>(
@@ -343,7 +349,7 @@ impl AudioIO {
         Ok(())
     }
 
-    pub fn resolve_configs(&mut self, preffered_rates: Vec<u32>) -> Result<(), String> {
+    fn resolve_configs(&mut self, preffered_rates: Vec<u32>) -> Result<(), String> {
         let input = self
             .device_manager
             .active_input_device
