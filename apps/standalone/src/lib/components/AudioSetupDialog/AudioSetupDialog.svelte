@@ -138,6 +138,7 @@
                 input: selectedInput,
                 output: selectedOutput
             });
+            await invoke("start_audio");
             onClose?.();
         } catch (error) {
             errorMessage = getErrorMessage(error);
