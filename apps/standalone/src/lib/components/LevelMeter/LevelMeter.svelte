@@ -1,82 +1,116 @@
 <script lang="ts">
-    import { Lock } from "@lucide/svelte";
+    import { onDestroy } from "svelte";
 
     export let label: string;
-    export let value: string;
-    export let activeBars = 23;
-    export let secondaryBars = 19;
+    export let value = -60;
+    export let min = -60;
+    export let max = 0;
+    export let unit = "dB";
+    export let clip = false;
+    export let labelSmoothing = 0.12;
+    export let ticks = [0, -6, -12, -18, -24, -30, -42, -48, -60];
 
-    const bars = Array.from({ length: 34 });
-    const scale = ["0", "-6", "-12", "-18", "-24", "-30", "-42", "-48", "-60"];
+    const barCount = 80;
+    const bars = Array.from({ length: barCount });
+    let displayValue = value;
+    let previousValue = value;
+    let smoothingFrame = 0;
 
-    $: firstLevel = Math.max(0, Math.min(activeBars, bars.length));
-    $: secondLevel = Math.max(0, Math.min(secondaryBars, bars.length));
-    $: isInput = label.toUpperCase() === "INPUT";
+    function clamp(next: number) {
+        return Math.max(min, Math.min(max, next));
+    }
+
+    function normalize(next: number) {
+        const range = max - min;
+
+        if (range <= 0) {
+            return 0;
+        }
+
+        return (clamp(next) - min) / range;
+    }
+
+    function tickOffset(tick: number) {
+        return `${(1 - normalize(tick)) * 100}%`;
+    }
+
+    function formatValue(next: number) {
+        return `${next.toFixed(0)} ${unit}`;
+    }
+
+    function startSmoothing() {
+        if (smoothingFrame) {
+            return;
+        }
+
+        smoothingFrame = requestAnimationFrame(smoothDisplayValue);
+    }
+
+    function smoothDisplayValue() {
+        const distance = value - displayValue;
+        const step = distance * labelSmoothing;
+
+        if (Math.abs(distance) < 0.05) {
+            displayValue = value;
+            smoothingFrame = 0;
+            return;
+        }
+
+        displayValue += step;
+        smoothingFrame = requestAnimationFrame(smoothDisplayValue);
+    }
+
+    $: normalizedValue = normalize(value);
+    $: activeBars = Math.round(normalizedValue * barCount);
+    $: clipped = clip || value >= max;
+    $: if (value !== previousValue) {
+        previousValue = value;
+        startSmoothing();
+    }
+
+    onDestroy(() => {
+        if (smoothingFrame) {
+            cancelAnimationFrame(smoothingFrame);
+        }
+    });
 </script>
 
 <aside class="meter-card" aria-label={`${label} level meter`}>
     <div class="meter-label">{label}</div>
-    <div class="clip-row">
+    <div class="clip-row" class:active={clipped}>
         <span>CLIP</span>
         <i></i>
     </div>
+
     <div class="meter-body">
-        <div class="bar-pair" aria-hidden="true">
-            <div class="bar-stack">
-                {#each bars as _, index}
-                    <span
-                        class:lit={index < firstLevel}
-                        class:warm={index >= 20}
-                        class:hot={index >= 28}
-                    ></span>
-                {/each}
-            </div>
-            <div class="bar-stack">
-                {#each bars as _, index}
-                    <span
-                        class:lit={index < secondLevel}
-                        class:warm={index >= 20}
-                        class:hot={index >= 28}
-                    ></span>
-                {/each}
-            </div>
+        <div class="bar-stack" aria-hidden="true">
+            {#each bars as _, index}
+                {@const percent = (index + 1) / barCount}
+                <span
+                    class:lit={index < activeBars}
+                    class:mid={percent >= 0.5 && percent < 0.9}
+                    class:hot={percent >= 0.9}
+                ></span>
+            {/each}
         </div>
         <div class="scale" aria-hidden="true">
-            {#each scale as tick}
-                <span>{tick}</span>
+            {#each ticks as tick}
+                <span style:top={tickOffset(tick)}>{tick}</span>
             {/each}
         </div>
     </div>
-    <div class="meter-value">{value}</div>
 
-    {#if isInput}
-        <div class="meter-actions">
-            <button class="mode active" type="button">Hi-Z</button>
-            <button class="lock" type="button" aria-label="Input lock" title="Input lock">
-                <Lock size={14} />
-            </button>
-        </div>
-        <div class="meter-strip">
-            <span>NOISE GATE</span>
-            <i></i>
-        </div>
-    {:else}
-        <button class="mute" type="button">MUTE</button>
-        <div class="meter-strip stereo">
-            <i></i>
-            <span>STEREO</span>
-        </div>
-    {/if}
+    <div class="meter-value">{formatValue(displayValue)}</div>
 </aside>
 
 <style>
     .meter-card {
         display: grid;
-        grid-template-rows: auto auto minmax(18rem, 1fr) auto auto auto;
+        grid-template-rows: auto auto minmax(0, 1fr) auto;
         gap: 0.55rem;
-        width: 10.6rem;
+        width: 7.25rem;
         min-height: 34rem;
-        padding: 1rem 0.75rem 0.65rem;
+        padding: 1rem 0.62rem 0.85rem;
         border: var(--border-panel);
         border-radius: var(--radius-panel);
         background:
@@ -99,8 +133,8 @@
         display: flex;
         align-items: center;
         justify-content: center;
-        gap: 0.75rem;
-        color: var(--color-accent-red);
+        gap: 0.6rem;
+        color: rgba(240, 91, 79, 0.1);
         font-size: 0.68rem;
         font-weight: 760;
     }
@@ -109,65 +143,84 @@
         width: 0.22rem;
         height: 0.85rem;
         border-radius: 999px;
+        background: rgba(240, 91, 79, 0.1);
+    }
+
+    .clip-row.active {
+        color: var(--color-accent-red);
+    }
+
+    .clip-row.active i {
         background: var(--color-accent-red);
         box-shadow: 0 0 8px rgba(240, 91, 79, 0.42);
     }
 
     .meter-body {
         display: grid;
-        grid-template-columns: 1fr auto;
-        gap: 0.7rem;
+        grid-template-columns: minmax(1.25rem, 1fr) 1.65rem;
+        gap: 0.58rem;
         align-items: stretch;
         min-height: 0;
-    }
-
-    .bar-pair {
-        display: flex;
-        justify-content: center;
-        gap: 0.55rem;
-        min-width: 0;
     }
 
     .bar-stack {
         display: flex;
         flex-direction: column-reverse;
-        justify-content: flex-start;
-        gap: 0.18rem;
-        padding: 0.1rem 0;
+        justify-content: space-between;
+        align-items: center;
+        min-height: 100%;
+        padding: 0;
     }
 
     .bar-stack span {
         display: block;
-        width: 1.12rem;
-        height: 0.16rem;
+        width: 1.08rem;
+        height: 0.1rem;
         border-radius: 999px;
-        background: rgba(71, 88, 101, 0.26);
+        background: rgba(71, 88, 101, 0.22);
     }
 
     .bar-stack span.lit {
-        background: linear-gradient(90deg, var(--color-accent-green), var(--color-meter-lime));
-        box-shadow: 0 0 9px rgba(22, 215, 161, 0.15);
+        background: linear-gradient(
+            90deg,
+            var(--color-accent-green),
+            var(--color-meter-lime)
+        );
+        box-shadow: 0 0 8px rgba(22, 215, 161, 0.14);
     }
 
-    .bar-stack span.lit.warm {
-        background: linear-gradient(90deg, var(--color-meter-lime), var(--color-meter-yellow));
-        box-shadow: 0 0 9px rgba(246, 241, 70, 0.18);
+    .bar-stack span.lit.mid {
+        background: linear-gradient(
+            90deg,
+            var(--color-meter-lime),
+            var(--color-meter-yellow)
+        );
+        box-shadow: 0 0 8px rgba(246, 241, 70, 0.18);
     }
 
     .bar-stack span.lit.hot {
-        background: var(--color-meter-yellow);
-        box-shadow: 0 0 11px rgba(246, 241, 70, 0.24);
+        background: linear-gradient(
+            90deg,
+            var(--color-meter-yellow),
+            var(--color-accent-red)
+        );
+        box-shadow: 0 0 10px rgba(240, 91, 79, 0.24);
     }
 
     .scale {
-        display: flex;
-        flex-direction: column;
-        justify-content: space-between;
+        position: relative;
+        min-height: 0;
         color: var(--color-text-muted);
-        font-size: 0.7rem;
+        font-size: 0.68rem;
         font-weight: 620;
         line-height: 1;
         text-align: right;
+    }
+
+    .scale span {
+        position: absolute;
+        right: 0;
+        transform: translateY(-50%);
     }
 
     .meter-value {
@@ -177,105 +230,21 @@
         text-align: center;
     }
 
-    .meter-actions {
-        display: grid;
-        grid-template-columns: 1fr 2.25rem;
-        gap: 0.45rem;
-    }
-
-    .mode,
-    .lock,
-    .mute {
-        min-height: 2rem;
-        border: 1px solid var(--color-control-border);
-        border-radius: var(--radius-control);
-        background: rgba(20, 29, 39, 0.72);
-        color: var(--color-text-soft);
-        cursor: pointer;
-        font-size: 0.76rem;
-        font-weight: 720;
-        letter-spacing: 0.04em;
-    }
-
-    .mode.active {
-        border-color: rgba(47, 134, 255, 0.45);
-        background: rgba(47, 134, 255, 0.14);
-        color: #65aeff;
-    }
-
-    .lock {
-        display: grid;
-        place-items: center;
-    }
-
-    .mute {
-        justify-self: center;
-        width: 5rem;
-    }
-
-    .meter-strip {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        min-height: 2.05rem;
-        margin: 0 -0.25rem -0.25rem;
-        padding: 0 0.8rem;
-        border-top: 1px solid var(--color-panel-line);
-        color: var(--color-text-muted);
-        font-size: 0.68rem;
-        font-weight: 740;
-        letter-spacing: 0.03em;
-    }
-
-    .meter-strip i {
-        width: 0.48rem;
-        aspect-ratio: 1;
-        border-radius: 50%;
-        background: var(--color-accent-green);
-        box-shadow: 0 0 9px rgba(22, 215, 161, 0.42);
-    }
-
-    .meter-strip.stereo {
-        justify-content: flex-start;
-        gap: 1.1rem;
-        font-size: 0.78rem;
-    }
-
     @media (max-width: 980px) {
         .meter-card {
-            width: min(100%, 28rem);
-            min-height: 12rem;
-            grid-template-rows: auto auto 1fr auto;
-            grid-template-columns: 1fr auto;
-            align-items: center;
-        }
-
-        .meter-label,
-        .clip-row {
-            grid-column: 1 / -1;
+            width: min(100%, 12rem);
+            min-height: 14rem;
         }
 
         .meter-body {
-            min-height: 7rem;
-        }
-
-        .meter-actions,
-        .mute,
-        .meter-strip {
-            grid-column: 2;
+            min-height: 9rem;
         }
     }
 
-    @media (max-width: 620px) {
+    @media (max-width: 680px) {
         .meter-card {
-            grid-template-columns: 1fr;
             width: 100%;
-        }
-
-        .meter-actions,
-        .mute,
-        .meter-strip {
-            grid-column: auto;
+            min-height: 16rem;
         }
     }
 </style>

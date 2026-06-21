@@ -7,20 +7,68 @@
     import SignalChain from "$lib/components/SignalChain/SignalChain.svelte";
     import StatusBar from "$lib/components/StatusBar/StatusBar.svelte";
     import { invoke } from "@tauri-apps/api/core";
-    import { onMount } from "svelte";
+    import { onDestroy, onMount } from "svelte";
+
+    type PeakMeters = {
+        input_db: number;
+        output_db: number;
+    };
 
     let audioSetupOpen = false;
+    let inputDb = -60;
+    let outputDb = -60;
+    let meterFrame = 0;
+    let lastMeterUpdate = 0;
+    let metersRequestInFlight = false;
+
+    const meterMin = -60;
+    const meterMax = 0;
+    const meterUpdateIntervalMs = 33;
 
     onMount(async () => {
         if ("__TAURI_INTERNALS__" in window) {
             try {
-                const isSelectedDevice = await invoke<boolean>("is_devices_selected");
+                const isSelectedDevice = await invoke<boolean>(
+                    "is_devices_selected",
+                );
                 audioSetupOpen = !isSelectedDevice;
             } catch {
                 audioSetupOpen = true;
             }
+
+            meterFrame = requestAnimationFrame(updateMeters);
         }
     });
+
+    onDestroy(() => {
+        if (meterFrame) {
+            cancelAnimationFrame(meterFrame);
+        }
+    });
+
+    async function updateMeters(timestamp: number) {
+        meterFrame = requestAnimationFrame(updateMeters);
+
+        if (
+            metersRequestInFlight ||
+            timestamp - lastMeterUpdate < meterUpdateIntervalMs
+        ) {
+            return;
+        }
+
+        lastMeterUpdate = timestamp;
+        metersRequestInFlight = true;
+
+        try {
+            const meters = await invoke<PeakMeters>("get_peak_dbs");
+            inputDb = Math.max(meterMin, meters.input_db);
+            outputDb = Math.max(meterMin, meters.output_db);
+        } catch {
+            // Meters can be unavailable before the engine is fully started.
+        } finally {
+            metersRequestInFlight = false;
+        }
+    }
 </script>
 
 <main class="screen" aria-label="Guitar processor mock interface">
@@ -31,16 +79,18 @@
         <section class="workspace" aria-label="Spectrum workspace">
             <LevelMeter
                 label="INPUT"
-                value="-8.7 dB"
-                activeBars={27}
-                secondaryBars={22}
+                value={inputDb}
+                min={meterMin}
+                max={meterMax}
+                clip={inputDb >= meterMax}
             />
             <AnalyzerDisplay />
             <LevelMeter
                 label="OUTPUT"
-                value="-7.3 dB"
-                activeBars={25}
-                secondaryBars={21}
+                value={outputDb}
+                min={meterMin}
+                max={meterMax}
+                clip={outputDb >= meterMax}
             />
         </section>
 

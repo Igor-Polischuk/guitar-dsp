@@ -29,24 +29,36 @@
     $: outputOptions = devices
         .filter((device) => device.is_output)
         .map((device) => ({ value: device.name, label: device.name }));
-    $: if (inputOptions.length > 0 && !inputOptions.some((option) => option.value === selectedInput)) {
+    $: if (
+        inputOptions.length > 0 &&
+        !inputOptions.some((option) => option.value === selectedInput)
+    ) {
         selectedInput = inputOptions[0].value;
     }
     $: if (inputOptions.length === 0 && selectedInput) {
         selectedInput = "";
     }
-    $: if (outputOptions.length > 0 && !outputOptions.some((option) => option.value === selectedOutput)) {
+    $: if (
+        outputOptions.length > 0 &&
+        !outputOptions.some((option) => option.value === selectedOutput)
+    ) {
         selectedOutput = outputOptions[0].value;
     }
     $: if (outputOptions.length === 0 && selectedOutput) {
         selectedOutput = "";
     }
-    $: canContinue = Boolean(selectedInput && selectedOutput && !loading && !submitting);
+    $: canContinue = Boolean(
+        selectedInput && selectedOutput && !loading && !submitting,
+    );
 
     const inputChannels = [{ value: "Input 1", label: "Input 1" }];
-    const outputChannels = [{ value: "Output 1 - 2 (Stereo)", label: "Output 1 - 2 (Stereo)" }];
+    const outputChannels = [
+        { value: "Output 1 - 2 (Stereo)", label: "Output 1 - 2 (Stereo)" },
+    ];
     const sampleRates = [{ value: "48.0 kHz", label: "48.0 kHz" }];
-    const bufferSizes = [{ value: "128 samples (2.7 ms)", label: "128 samples (2.7 ms)" }];
+    const bufferSizes = [
+        { value: "128 samples (2.7 ms)", label: "128 samples (2.7 ms)" },
+    ];
 
     $: if (open) {
         void loadDevices();
@@ -136,7 +148,7 @@
         try {
             await invoke("set_devices", {
                 input: selectedInput,
-                output: selectedOutput
+                output: selectedOutput,
             });
             await invoke("start_audio");
             onClose?.();
@@ -199,7 +211,9 @@
             </div>
 
             <div class="segmented" aria-label="Input mode">
-                <button class="active" type="button" disabled>Hi-Z (Instrument)</button>
+                <button class="active" type="button" disabled
+                    >Hi-Z (Instrument)</button
+                >
                 <button type="button" disabled>Line Level</button>
             </div>
 
@@ -244,7 +258,9 @@
             </div>
 
             <div class="segmented" aria-label="Output mode">
-                <button class="active" type="button" disabled>Studio (Flat)</button>
+                <button class="active" type="button" disabled
+                    >Studio (Flat)</button
+                >
                 <button type="button" disabled>Live (Enhanced)</button>
             </div>
 
@@ -277,7 +293,9 @@
     {#if loading}
         <p class="message">Loading audio devices...</p>
     {:else if inputOptions.length === 0 || outputOptions.length === 0}
-        <p class="message error">No compatible input/output device pair was found.</p>
+        <p class="message error">
+            No compatible input/output device pair was found.
+        </p>
     {:else if errorMessage}
         <p class="message error">{errorMessage}</p>
     {/if}

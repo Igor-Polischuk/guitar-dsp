@@ -96,9 +96,9 @@ impl British800Amp {
         for i in 0..samples.len() {
             let mut x = samples[i];
             x = self.gain_stage.up_lpf_1.process(x) * 4.0;
-            // x = self.gain_stage.up_lpf_2.process(x);
-            // x = self.gain_stage.up_lpf_3.process(x);
-            // x = self.gain_stage.up_lpf_4.process(x);
+            x = self.gain_stage.up_lpf_2.process(x);
+            x = self.gain_stage.up_lpf_3.process(x);
+            x = self.gain_stage.up_lpf_4.process(x);
             // Stage 1 lump gain and clipping
             if self.params.get_active_input() == British800Input::High {
                 x *= 30.0; // approximate value, based on schema it within 40-50
@@ -131,8 +131,8 @@ impl British800Amp {
 
             x = self.gain_stage.down_lpf_1.process(x);
             x = self.gain_stage.down_lpf_2.process(x);
-            // x = self.gain_stage.down_lpf_3.process(x);
-            // x = self.gain_stage.down_lpf_4.process(x);
+            x = self.gain_stage.down_lpf_3.process(x);
+            x = self.gain_stage.down_lpf_4.process(x);
 
             samples[i] = x;
         }
