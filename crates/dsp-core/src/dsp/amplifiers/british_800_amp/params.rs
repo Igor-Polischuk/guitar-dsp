@@ -3,7 +3,17 @@ use std::sync::{
     atomic::{AtomicU8, Ordering},
 };
 
-use crate::utils::AtomicF32;
+use crate::{dsp::amplifiers::british_800_amp::knobs::BRITISH_800_KNOBS, utils::AtomicF32};
+
+fn normalize_knob_linear(knob_value: f32) -> f32 {
+    (knob_value / 10.0).clamp(0.0, 1.0)
+}
+
+fn normalize_knob_log(knob_value: f32) -> f32 {
+    let normalized = normalize_knob_linear(knob_value);
+
+    (1.0 + 9.0 * normalized).log10()
+}
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum British800Input {
@@ -56,9 +66,9 @@ impl British800Params {
 
                 self.pre_amp_volume.set(pot);
             }
-            "bass" => self.bass.set(knob_value),
-            "mid" => self.mid.set(knob_value),
-            "treble" => self.treble.set(knob_value),
+            "bass" => self.bass.set(normalize_knob_log(knob_value)),
+            "mid" => self.mid.set(normalize_knob_linear(knob_value)),
+            "treble" => self.treble.set(normalize_knob_linear(knob_value)),
             "presence" => {
                 // let feedback_high_cut_db = -12.0 * knob_value;
                 self.presence.set(knob_value)
@@ -101,7 +111,7 @@ impl British800Params {
 
 impl Default for British800Params {
     fn default() -> Self {
-        British800Params {
+        let params = British800Params {
             presence: Arc::new(AtomicF32::new(0.0)),
             bass: Arc::new(AtomicF32::new(0.0)),
             mid: Arc::new(AtomicF32::new(0.0)),
@@ -109,6 +119,16 @@ impl Default for British800Params {
             master_volume: Arc::new(AtomicF32::new(0.0)),
             pre_amp_volume: Arc::new(AtomicF32::new(0.25)),
             input: Arc::new(AtomicU8::new(British800Input::High.as_u8())),
-        }
+        };
+
+        // TODO: better handle default values (with enum)
+        params.set("presence", BRITISH_800_KNOBS[0].default);
+        params.set("bass", BRITISH_800_KNOBS[1].default);
+        params.set("mid", BRITISH_800_KNOBS[2].default);
+        params.set("treble", BRITISH_800_KNOBS[3].default);
+        params.set("master_volume", BRITISH_800_KNOBS[4].default);
+        params.set("pre_amp_volume", BRITISH_800_KNOBS[5].default);
+
+        params
     }
 }
