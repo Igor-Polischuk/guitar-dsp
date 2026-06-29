@@ -1,0 +1,8 @@
+[package]
+name = "wav-renderer"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+hound.workspace = true
+dsp-core = { path = "../../crates/dsp-core" }

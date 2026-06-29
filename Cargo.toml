@@ -3,7 +3,8 @@ resolver = "3"
 members = [
     "crates/dsp-core",
     "apps/standalone/src-tauri",
-    "crates/audio-io"
+    "crates/audio-io",
+    "apps/wav-renderer",
 ]
 
 [workspace.package]
