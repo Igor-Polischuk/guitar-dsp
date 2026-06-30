@@ -18,7 +18,7 @@ const GND: Option<usize> = None;
 pub struct NodalCapacitor {
     n1: Option<usize>,
     n2: Option<usize>,
-    c: f32,
+    // c: f32,
     g: f32,
     i_hist: f32,
 }
@@ -30,7 +30,7 @@ impl NodalCapacitor {
         Self {
             n1,
             n2,
-            c,
+            // c,
             g,
             i_hist: 0.0,
         }
@@ -61,8 +61,7 @@ impl NodalCapacitor {
 }
 
 pub struct MarshallToneStack {
-    sample_rate: f32,
-
+    // sample_rate: f32,
     bass: Arc<AtomicF32>,
     mid: Arc<AtomicF32>,
     treble: Arc<AtomicF32>,
@@ -80,8 +79,7 @@ impl MarshallToneStack {
         treble: Arc<AtomicF32>,
     ) -> Self {
         Self {
-            sample_rate,
-
+            // sample_rate,
             bass,
             mid,
             treble,
@@ -112,12 +110,6 @@ impl MarshallToneStack {
         }
     }
 
-    // pub fn set_knobs(&mut self, bass: f32, mid: f32, treble: f32) {
-    //     self.bass = bass.clamp(0.0, 1.0);
-    //     self.mid = mid.clamp(0.0, 1.0);
-    //     self.treble = treble.clamp(0.0, 1.0);
-    // }
-
     pub fn process_sample(&mut self, input: f32) -> f32 {
         let mut g = [[0.0_f32; N]; N];
         let mut rhs = [0.0_f32; N];
@@ -131,7 +123,7 @@ impl MarshallToneStack {
 
         let r_treble_total = 250_000.0;
         let r_bass_total = 1_000_000.0;
-        let r_mid_total = 25_000.0;
+        let r_mid_total = 22_000.0;
 
         let r_load = 1_000_000.0; // master volume / next stage load approximation
 

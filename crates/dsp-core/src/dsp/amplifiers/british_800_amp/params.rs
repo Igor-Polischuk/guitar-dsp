@@ -62,9 +62,8 @@ impl British800Params {
             "pre_amp_volume" => {
                 // Value from knob [1; 10] into actual data 0...1
                 let normalized = (knob_value / 10.0).clamp(0.0, 1.0);
-                let pot = normalized.powf(2.0);
 
-                self.pre_amp_volume.set(pot);
+                self.pre_amp_volume.set(normalized);
             }
             "bass" => self.bass.set(normalize_knob_log(knob_value)),
             "mid" => self.mid.set(normalize_knob_linear(knob_value)),

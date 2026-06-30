@@ -64,3 +64,34 @@ impl HighShelfFilter {
             .update_coefficients(b0 / a0, b1 / a0, b2 / a0, a1 / a0, a2 / a0);
     }
 }
+
+// TODO get rid of
+pub struct HighShelfFilterSimpl {
+    filter: BiquadFilter,
+}
+
+impl HighShelfFilterSimpl {
+    pub fn new(sample_rate: f32, frequency: f32, gain_db: f32, q: f32) -> Self {
+        let ac = 10.0_f32.powf(gain_db / 40.0);
+
+        let omega = 2.0 * PI * (frequency / sample_rate);
+        let cos_w = omega.cos();
+        let beta = 2.0 * ac.sqrt() * (omega.sin() / (2.0 * q));
+
+        let b0 = ac * ((ac + 1.0) + (ac - 1.0) * cos_w + beta);
+        let b1 = -2.0 * ac * ((ac - 1.0) + (ac + 1.0) * cos_w);
+        let b2 = ac * ((ac + 1.0) + (ac - 1.0) * cos_w - beta);
+
+        let a0 = (ac + 1.0) - (ac - 1.0) * cos_w + beta;
+        let a1 = 2.0 * ((ac - 1.0) - (ac + 1.0) * cos_w);
+        let a2 = (ac + 1.0) - (ac - 1.0) * cos_w - beta;
+
+        HighShelfFilterSimpl {
+            filter: BiquadFilter::new(b0 / a0, b1 / a0, b2 / a0, a1 / a0, a2 / a0),
+        }
+    }
+
+    pub fn process(&mut self, x: f32) -> f32 {
+        self.filter.process(x)
+    }
+}
